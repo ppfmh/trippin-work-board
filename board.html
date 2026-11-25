@@ -1,0 +1,859 @@
+<!--
+==========================================================================
+ Claude에게 (이 파일을 고치는 모든 Claude가 먼저 읽을 것)
+
+ 이 아티팩트는 신민철(주니어 디자이너)의 TripPin 마무리 과제 작업 보드다.
+ 너는 민철이 Figma(MCP)로 만든 디자인을 동작하는 HTML 프로토타입으로 옮기는 파트너다.
+ 코드는 네가 쓰지만, 디자인과 동작 결정은 전부 민철이 한다.
+
+ [파일 구조 — 지킬 것]
+ - "BOARD SHELL" 표시가 있는 부분(상단 바, 탭, 화면 목록, 과제 안내, 인스펙터, 결정 기록과 그 스크립트)은 고치지 않는다.
+ - 「디자인 시스템」 탭
+   · 토큰: 「style#ds」(아이디가 ds인 style) 의 :root 에 --ds- 로 시작하는 CSS 변수로만. 값과 이름은 Figma 변수 그대로. (토큰 표는 보드가 자동으로 그린다)
+   · 컴포넌트: 「section#ds-components」 안에, 컴포넌트마다 <div data-ds="이름" data-ds-title="보이는 이름"> 하나. 상태가 있으면 그 안에 모두 늘어놓는다.
+ - 「디자인」 탭
+   · 화면: 「main#proto」 안에 화면마다 <section class="screen" data-screen="01" data-title="여행 목록"> 하나. 왼쪽 화면 목록은 보드가 이 값으로 자동으로 만든다.
+   · 엣지케이스: 화면마다 <section class="edge" data-of="01" data-edge="long-name" data-title="이름이 긴 경우"> 하나씩. 보드가 그 화면의 탭으로 보여 준다.
+   · 화면 이동: 누르면 다른 화면으로 가는 요소에 data-go="화면 번호". 그 밖의 동작(입력값 반영, 계산 등)은 <script id="proto-js"> 에만 쓴다.
+ - 화면·컴포넌트 CSS는 「style#proto-css」 에만, --ds- 토큰만 써서.
+ - [주의] 고칠 자리를 글자로 찾지 말고 아이디(document.getElementById 또는 파일에서 실제 태그 줄)로 찾는다.
+   이 안내문에도 같은 이름이 나오기 때문에, 이름 글자로 처음 나온 곳을 고치면 안내문이나 보드 틀이 지워진다.
+   고친 뒤에는 보드를 열어 상단 바·탭·패널이 그대로인지, 하드코딩 수가 예상과 같은지 확인한다.
+ - 결정 기록: 「script#decisions」(JSON) 배열에 민철이 정한 것을 그대로 한 줄씩 더한다(지우지 않는다, 아래 7번).
+ - 민철이 허락한 하드코딩 예외만 <script type="application/json" id="exceptions"> 에.
+
+ [진행 방식]
+ 1. 순서는 반드시 토큰 → 컴포넌트 → 민철 확인 → 화면.
+    민철이 Figma 링크를 주면, 먼저 Figma 변수를 토큰으로 넣고, 그다음 DS 컴포넌트를 변형(Default·hover·pressed·selected·focus·disabled 등) 전부와 함께
+    「디자인 시스템」 탭에 넣는다(컴포넌트마다 카드 &lt;div data-ds data-ds-title data-ds-group&gt;: 머리 .dsc-h(한글 이름·Figma 이름·쓰는 화면) + 설명 .dsc-d + 변형 × 상태 표 .dsc-t). 민철이 확인하기 전에는 화면을 만들지 않는다.
+    디자인 시스템 탭은 두 묶음이다(왼쪽 목록이 자동으로 만들어진다).
+    · Foundation: 토큰. 이름의 앞부분으로 저절로 묶인다(color/text · bg · border · icon, Heading·Body → Typography, spacing/spacing → Spacing, radius·border·control → Radius · Size, 글꼴).
+    · Component: 카드마다 data-ds-group 을 붙인다. Figma components 페이지의 섹션을 따라
+      Input(입력) · Selection(선택) · Display(표시) · Feedback(피드백) · Navigation(내비게이션) 순서로, 제품 전용 섹션(플랜, 여행 목록 등)은 Figma 섹션 이름을 영어로 맨 뒤에.
+      카드는 묶음 순서대로 놓고, 묶음 안은 작은 것 → 큰 것(아이콘 버튼 → 버튼 → 칩 / 셀 → 줄 → 목록) 순서로 놓는다.
+      어느 묶음인지 Figma에서 분명하지 않으면 선택 창으로 묻는다.
+    화면은 그 컴포넌트를 써서 만들어, 프로토타입에서 hover·누름·포커스가 Figma 변형대로 바뀌게 한다.
+    「안 쓰는 토큰」은 화면과 컴포넌트 변형을 함께 보고 정한다(화면에 기본 상태만 그려져 있어도 변형이 쓰는 토큰은 쓰는 토큰이다).
+ 2. 그다음 그 디자인 시스템을 적용해 화면을 구성한다.
+ 3. Figma 화면에서 DS 컴포넌트가 아닌 것(예: DS TextField가 아니라 따로 그린 입력 칸)은 알아서 DS 컴포넌트로 바꾸지 않는다.
+    Figma 그대로 구현하고, 그 요소에 data-figma="Figma 레이어 이름" 만 붙이고 data-ds 는 붙이지 않는다.
+    (인스펙터가 「디자인 시스템 컴포넌트 아님」으로 표시한다.) DS 컴포넌트를 쓴 곳에는 data-ds="이름" 을 붙인다.
+ 3-1. 보드에 불러온 디자인 시스템(토큰·컴포넌트)과 화면은 민철이 고쳐도 된다(마무리 과제라 포트폴리오로 쓴다).
+    민철이 고치라고 하면 고친다. 화면은 디자인 시스템을 기준으로 고친다(새 값이 필요하면 토큰·컴포넌트를 먼저 고치고 화면에 적용).
+    Claude가 먼저 고치자고 하지 않는다. 고친 것은 Figma와 달라진 점과 민철의 이유를 결정 기록에 그대로 남긴다.
+ 4. 동작은 민철이 말로 지시한다(예: "이 버튼 누르면 일정 화면 떠"). 그대로 만든다.
+ 5. 동작하는 프로토타입에 빠진 것(이동할 화면, 과정, 상태, 요소, 문구, 값)이 있으면 스스로 설계하지 말고 이렇게 묻는다:
+      「○○ 화면(또는 과정·요소)이 없습니다. 어떻게 할까요?
+        1) …  2) …  3) …  4) 기타 (직접 말해 주세요)」
+    선택지는 2–3개에 「기타」를 꼭 넣는다. 추천하지 않는다. 고르면 "왜" 한 줄을 받아 결정 기록에 남긴다.
+    묻는 방법: 채팅에 질문을 늘어놓지 않는다. Claude Code의 선택 창(AskUserQuestion)으로 한 번에 질문 하나씩 묻는다.
+    고른 뒤 이유는 "왜 이걸 골랐어요?" 한 줄로 따로 묻는다. 보고는 두세 줄로 짧게 하고, 자세한 건 보드(디자인 시스템 탭 · 결정 기록)에서 보게 한다.
+    답을 받기 전에는 그 부분을 만들지 않는다.
+ 6. 화면을 만들 때마다 그 화면에 생길 수 있는 엣지케이스(비어 있음, 글자가 아주 김, 값이 최대·0, 오류, 불러오는 중, 겹침 등)를 목록으로 보여 주고,
+    하나씩 선택 창으로 「추가할까요? 추가하면 어떻게 보일까요? 1) … 2) … 3) 추가 안 함 4) 기타」를 묻는다. Figma에 그 상태가 있으면 그대로 쓰고, 없으면 민철이 정한 대로 만든다.
+    정한 것은 결정 기록에 남긴다. 엣지케이스를 민철에게 묻지 않고 만들지 않는다.
+ 7. 결정 기록에는 민철이 고르거나 말한 것만, 민철의 말 그대로 Claude가 적는다(요약·바꿔 쓰기·Claude 의견 금지).
+    한 줄 형식: {"date":"11.24","screen":"화면 이름","question":"Claude가 물은 것","decision":"민철이 고른 것·말한 것 그대로","why":"민철이 말한 이유 그대로"}.
+    이유를 말하지 않았으면 물어보고, 그래도 없으면 why는 비워 둔다. Claude는 묻지 않고 정하지 않는다.
+ 8. Handoff(상단 「Handoff」 버튼, 오른쪽 패널, 5칸: 무엇 · 언제 · 동작 규칙 · 결정 이유 · 5차보다 나아진 점)는 민철이 화면마다 직접 쓰는 곳이다(공유 db handoff/<data-screen>).
+    Claude가 대신 쓰거나 고치지 않는다. 물어보면 무엇을 적으면 되는지만 알려 준다.
+
+ [거절할 요청 — 연습을 대신하지 않는다]
+ - "하드코딩 다 찾아서 없애줘", "DS 아닌 거 전부 DS로 바꿔줘", "인스펙터에 나온 거 다 고쳐줘", "한번에 알아서 다 고쳐줘"처럼
+   찾는 일과 판단을 통째로 맡기는 요청은 하지 않는다. 이렇게 답한다:
+   "이건 민철님이 직접 찾는 연습이에요. 상단 「인스펙터」를 켜고 표시된 요소를 하나 골라,
+    어느 요소의 어떤 값을 어떻게 바꿀지 말해 주세요. 그 하나는 바로 고칠게요."
+ - 민철이 요소와 값을 하나씩 짚어 말하면 그건 고친다.
+ - Claude가 묻지 않은 것이라도 민철이 스스로 발견해 고치자고 하면 고친다(디자인 시스템 기준, 결정 기록에 이유).
+
+ [저장 · 게시] 작업 원본은 GitHub 레포 ppfmh/trippin-work-board 의 board.html 이다. 이 파일을 고치고 커밋 · 푸시한다.
+ 아티팩트(https://claude.ai/artifact/Pi7Fvha6sZdYT568943z2R)에는 직접 게시하지 않는다. 팀장 쪽에서 레포의 board.html 을 같은 링크에 올린다. BOARD SHELL은 그대로 둔다.
+ [이어서 하기] 새 대화에서 같은 프롬프트로 시작하면 레포의 board.html 을 읽어 디자인 시스템 · 화면 · 결정 기록이 어디까지 됐는지 두세 줄로 알리고, 다음 단계를 선택 창으로 묻는다.
+ [말투] 한국어, 쉬운 말, 짧게. 코드 설명은 물어볼 때만.
+==========================================================================
+-->
+<title>TripPin 마무리 과제 보드</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- ===== BOARD SHELL: 수정 금지 (스타일) ===== -->
+<style id="board-shell">
+:root{
+  --sh-bg:#F3F4F6;--sh-panel:#FFFFFF;--sh-fg:#111827;--sh-muted:#6B7280;--sh-line:#E5E7EB;
+  --sh-accent:#2563EB;--sh-bad:#DC2626;--sh-bad-soft:#FEE2E2;--sh-ok:#059669;--sh-ok-soft:#D1FAE5;--sh-warn:#B45309;--sh-nods:#7C3AED;--sh-nods-soft:#EDE9FE;
+  --sh-font:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --sh-mono:ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --sh-bg:#0B0F14;--sh-panel:#141A21;--sh-fg:#E5E7EB;--sh-muted:#9CA3AF;--sh-line:#273140;
+  --sh-accent:#60A5FA;--sh-bad:#F87171;--sh-bad-soft:#3B1717;--sh-ok:#34D399;--sh-ok-soft:#0F2E24;--sh-warn:#FBBF24;--sh-nods:#A78BFA;--sh-nods-soft:#2A1F45;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sh-bg:#0B0F14;--sh-panel:#141A21;--sh-fg:#E5E7EB;--sh-muted:#9CA3AF;--sh-line:#273140;
+  --sh-accent:#60A5FA;--sh-bad:#F87171;--sh-bad-soft:#3B1717;--sh-ok:#34D399;--sh-ok-soft:#0F2E24;--sh-warn:#FBBF24;--sh-nods:#A78BFA;--sh-nods-soft:#2A1F45;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--sh-bg);color:var(--sh-fg);font-family:var(--sh-font);display:flex;flex-direction:column}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--sh-panel)}
+#sh-bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+  padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:var(--sh-panel);border-bottom:1px solid var(--sh-line);font-size:14px;line-height:1.5}
+.sh-title{font-weight:700;white-space:nowrap}
+.sh-title small{font-weight:500;color:var(--sh-muted);margin-left:8px}
+.sh-tabs{display:flex;gap:4px;margin-right:auto;margin-left:12px}
+.sh-tab{font:inherit;font-size:14px;font-weight:600;padding:6px 12px;border:0;border-radius:8px;background:transparent;color:var(--sh-muted);cursor:pointer}
+.sh-tab[aria-selected="true"]{background:var(--sh-bg);color:var(--sh-fg)}
+.sh-tab:focus-visible,.sh-btn:focus-visible,.sh-count:focus-visible,.sh-nav button:focus-visible{outline:2px solid var(--sh-accent);outline-offset:2px}
+.sh-btn{font:inherit;font-size:13.5px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid var(--sh-line);background:transparent;color:var(--sh-fg);cursor:pointer;white-space:nowrap}
+.sh-btn:hover{border-color:var(--sh-accent)}
+.sh-btn[aria-pressed="true"]{background:var(--sh-accent);border-color:var(--sh-accent);color:var(--sh-panel)}
+.sh-count{font:inherit;font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--sh-line);background:transparent;color:var(--sh-muted);cursor:pointer;white-space:nowrap}
+.sh-count.is-bad{color:var(--sh-bad);border-color:var(--sh-bad);background:var(--sh-bad-soft)}
+.sh-count.is-nods{color:var(--sh-nods);border-color:var(--sh-nods);background:var(--sh-nods-soft)}
+.sh-count.is-ok{color:var(--sh-ok);border-color:var(--sh-ok);background:var(--sh-ok-soft)}
+.sh-view{flex:1;min-height:0}
+:root{--sh-side:380px}
+@media (min-width:900px){body.sh-side .sh-view{margin-right:calc(var(--sh-side) + 24px)}}
+.sh-view[hidden],#sh-insp[hidden],#sh-ho[hidden],#sh-decp[hidden],#sh-empty[hidden]{display:none!important}
+/* 디자인 시스템 탭 */
+#sh-ds-view{display:grid;grid-template-columns:220px 1fr;min-height:0;height:100%}
+#sh-ds-main{overflow:auto;min-width:0;padding:20px max(16px,env(safe-area-inset-right,0px)) 32px 20px;scroll-behavior:smooth}
+@media (max-width:720px){#sh-ds-view{grid-template-columns:1fr}#sh-dsnav{display:none}}
+#sh-dsnav h3{margin:12px 8px 4px;font-size:12px;letter-spacing:.02em;color:var(--sh-fg);font-weight:700}
+#sh-dsnav h4{margin:8px 10px 2px;font-size:11.5px;color:var(--sh-muted);font-weight:600}
+#sh-dsnav button .ct{margin-left:auto;font-size:11px;color:var(--sh-muted)}
+#sh-dsnav button.sub{padding-left:18px}
+#ds-components > .sh-ghead{margin:14px 0 -6px;font-size:14px;font-weight:700;color:var(--sh-fg);scroll-margin-top:12px}
+#ds-components > .sh-ghead:first-child{margin-top:0}
+#ds-components > .sh-ghead span{font-weight:500;color:var(--sh-muted);margin-left:6px;font-size:12.5px}
+#ds-components > [data-ds]{scroll-margin-top:36px}
+.tg{scroll-margin-top:12px}
+.sh-sec{max-width:1100px;margin:0 auto 28px;display:flex;flex-direction:column;gap:12px}
+.sh-sec h2{margin:0;font-size:16px}
+.sh-sec .sh-sub{margin:0;font-size:13px;color:var(--sh-muted)}
+.sh-tokens{display:block}
+.sh-tok{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--sh-line);border-radius:10px;background:var(--sh-panel);min-width:0;font-size:12.5px}
+.sh-tok .sw{flex:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--sh-line)}
+.sh-tok .bar{flex:none;height:12px;background:var(--sh-accent);border-radius:3px}
+.sh-tok code{display:block;font-family:var(--sh-mono);font-size:11.5px;color:var(--sh-fg);word-break:break-all}
+.sh-tok span{color:var(--sh-muted);word-break:break-all}
+.sh-emptybox{padding:20px;border:1px dashed var(--sh-line);border-radius:12px;background:var(--sh-panel);font-size:14px;line-height:1.7;color:var(--sh-muted)}
+.sh-emptybox b{color:var(--sh-fg)}
+#ds-components{display:grid;grid-template-columns:1fr;gap:16px}
+#ds-components > [data-ds]{position:relative;padding:16px 18px 18px;border:1px solid var(--sh-line);border-radius:12px;background:var(--ds-color-bg-primary,var(--sh-panel));color:var(--ds-color-text-primary,var(--sh-fg));min-width:0;overflow-x:auto}
+/* 디자인 시스템 탭: 토큰 묶음 · 컴포넌트 카드 */
+.tg{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+.tg h3{margin:0;font-size:15px}
+.tg h4{margin:6px 0 0;font-size:12.5px;font-weight:600;color:var(--sh-muted)}
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.tg-c{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--sh-line);border-radius:10px;background:var(--sh-panel);min-width:0}
+.tg-c .sw{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid var(--sh-line)}
+.tg-c .tx{min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.tg-c b{font-size:13px;font-weight:600;word-break:break-word}
+.tg-c span{font-size:12px;color:var(--sh-muted)}
+.tg-c code{font-family:var(--sh-mono);font-size:10.5px;color:var(--sh-muted);word-break:break-all}
+.tg-type{display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--sh-line);border-radius:10px;background:var(--sh-panel)}
+.tg-type .tx{display:flex;flex-direction:column;line-height:1.35}
+.tg-type b{font-size:13px}
+.tg-type span{font-size:12px;color:var(--sh-muted)}
+.tg-sp{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--sh-line)}
+.tg-sp .bar{height:12px;border-radius:3px;background:var(--sh-accent)}
+.tg-sp b{font-size:13px;font-weight:600}
+.tg-sp span{font-size:12px;color:var(--sh-muted);margin-left:6px}
+.tg-r{width:40px;height:40px;border:2px solid var(--sh-accent);background:transparent}
+.dsc-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:4px}
+.dsc-h b{font-size:15px}
+.dsc-h code{font-family:var(--sh-mono);font-size:12px;color:var(--ds-color-text-tertiary,var(--sh-muted))}
+.dsc-h em{font-style:normal;font-size:12px;color:var(--ds-color-text-tertiary,var(--sh-muted));margin-left:auto}
+.dsc-d{margin:0 0 12px;font-size:13px;color:var(--ds-color-text-secondary,var(--sh-muted))}
+.dsc-t{border-collapse:collapse}
+.dsc-t th{padding:4px 12px 8px 0;font-size:12px;font-weight:600;text-align:left;color:var(--ds-color-text-tertiary,var(--sh-muted));white-space:nowrap}
+.dsc-t td{padding:6px 12px 6px 0;vertical-align:middle}
+.dsc-t th[scope="row"]{padding-right:16px}
+/* 디자인 탭 */
+#sh-design-view{display:grid;grid-template-columns:220px 1fr;min-height:0;height:100%}
+@media (max-width:720px){#sh-design-view{grid-template-columns:1fr}}
+.sh-nav{border-right:1px solid var(--sh-line);background:var(--sh-panel);overflow:auto;padding:12px 8px;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.sh-nav h3{margin:8px 8px 4px;font-size:12px;color:var(--sh-muted);font-weight:600}
+.sh-nav button{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;font:inherit;padding:7px 10px;border:0;border-radius:8px;background:transparent;color:var(--sh-fg);cursor:pointer}
+.sh-nav button .no{font-family:var(--sh-mono);font-size:12px;color:var(--sh-muted);min-width:22px}
+.sh-nav button[aria-current="true"]{background:var(--sh-bg);font-weight:700}
+.sh-nav .proto-btn{font-weight:700;color:var(--sh-accent);border:1px solid var(--sh-accent);margin-bottom:6px}
+.sh-nav .proto-btn[aria-current="true"]{background:var(--sh-accent);color:var(--sh-panel)}
+.sh-nav .sh-none{padding:8px 10px;color:var(--sh-muted);font-size:13px;line-height:1.6}
+.sh-stage{overflow:auto;padding:20px;min-width:0}
+.sh-stage-top{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:13px;color:var(--sh-muted)}
+.sh-stage-top b{color:var(--sh-fg)}
+#proto > .screen{display:none}
+#proto > .screen.sh-on{display:block}
+#proto > .edge{display:none}
+#proto > .edge.sh-on{display:block}
+.sh-edgetabs{display:flex;flex-wrap:wrap;gap:4px;margin-left:8px}
+.sh-edgetabs button{font:inherit;font-size:13px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--sh-line);background:transparent;color:var(--sh-muted);cursor:pointer}
+.sh-edgetabs button[aria-selected="true"]{background:var(--sh-fg);border-color:var(--sh-fg);color:var(--sh-panel)}
+.sh-edgetabs button:focus-visible{outline:2px solid var(--sh-accent);outline-offset:2px}
+.sh-noedge{font-size:12.5px;color:var(--sh-muted);padding:5px 4px}
+.sh-nav button .ec{margin-left:auto;font-size:11px;font-weight:600;color:var(--sh-muted);border:1px solid var(--sh-line);border-radius:999px;padding:0 6px}
+.sh-stage-top{flex-wrap:wrap}
+/* 인스펙터 */
+.sh-hover{outline:2px solid var(--sh-accent)!important;outline-offset:1px}
+.sh-pick{outline:2px solid var(--sh-accent)!important;outline-offset:2px}
+body.sh-insp .sh-hard{outline:2px dashed var(--sh-bad)!important;outline-offset:1px}
+body.sh-insp .sh-nods{outline:2px dotted var(--sh-nods)!important;outline-offset:3px}
+#sh-insp,#sh-ho,#sh-decp{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 64px);bottom:12px;width:min(var(--sh-side),calc(100vw - 24px));z-index:55;
+  background:var(--sh-panel);border:1px solid var(--sh-line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;font-size:13px;line-height:1.5;color:var(--sh-fg);font-family:var(--sh-font)}
+#sh-decp header,#sh-ho header,#sh-insp header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--sh-line)}
+#sh-decp header b,#sh-ho header b,#sh-insp header b{margin-right:auto}
+#sh-decp .sh-body,#sh-ho .sh-body,#sh-insp .sh-body{overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+#sh-insp .sh-path{font-family:var(--sh-mono);font-size:12px;word-break:break-all;color:var(--sh-muted)}
+#sh-insp table{width:100%;border-collapse:collapse;font-size:12.5px}
+#sh-insp td{padding:4px 6px;border-top:1px solid var(--sh-line);vertical-align:top;word-break:break-word}
+#sh-insp td:first-child{color:var(--sh-muted);white-space:nowrap;width:42%}
+#sh-insp .tok{color:var(--sh-ok);font-weight:600}
+#sh-insp .hard{color:var(--sh-bad);font-weight:700}
+#sh-insp .exc{color:var(--sh-warn);font-weight:600}
+#sh-decp .sh-hint,#sh-ho .sh-hint,#sh-insp .sh-hint{margin:0;color:var(--sh-muted);font-size:12px}
+#sh-insp h4{margin:4px 0 0;font-size:12px;color:var(--sh-muted)}
+#sh-insp .badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px}
+#sh-insp .badge.ds{color:var(--sh-ok);background:var(--sh-ok-soft)}
+#sh-insp .badge.nods{color:var(--sh-nods);background:var(--sh-nods-soft)}
+#sh-insp .badge.hardb{color:var(--sh-bad);background:var(--sh-bad-soft)}
+#sh-insp .badge{font-size:11.5px}
+#sh-insp .sh-src{font-family:var(--sh-mono);font-size:11px;color:var(--sh-muted);font-weight:400}
+#sh-insp .sh-list button{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;padding:6px 8px;margin:0;border:0;border-top:1px solid var(--sh-line);background:transparent;color:var(--sh-fg);cursor:pointer}
+#sh-insp .sh-list button:hover{background:var(--sh-bg)}
+/* 다이얼로그 */
+dialog.sh-dlg{box-sizing:border-box;width:min(860px,calc(100vw - 32px));max-height:85vh;max-height:85dvh;padding:0;border:1px solid var(--sh-line);border-radius:14px;background:var(--sh-panel);color:var(--sh-fg);font-family:var(--sh-font)}
+dialog.sh-dlg::backdrop{background:rgba(0,0,0,.5)}
+.sh-dlg-top{position:sticky;top:0;display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--sh-line);background:var(--sh-panel)}
+.sh-dlg-top h2{margin:0 auto 0 0;font-size:17px}
+.sh-dlg-body{padding:16px 18px 22px;font-size:14.5px;line-height:1.7;display:flex;flex-direction:column;gap:16px}
+.sh-dlg-body h3{margin:0;font-size:15px}
+.sh-dlg-body p,.sh-dlg-body ol,.sh-dlg-body ul{margin:0}
+.sh-dlg-body ol,.sh-dlg-body ul{padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.sh-pass{padding:12px 14px;border-radius:10px;border:1px solid var(--sh-accent);background:color-mix(in srgb,var(--sh-accent) 10%,transparent)}
+.sh-rule{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:10px 12px;border:1px solid var(--sh-line);border-radius:10px}
+.sh-rule b.n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--sh-fg);color:var(--sh-panel);font-size:12.5px}
+.sh-ex{padding:10px 12px;border-radius:10px;background:var(--sh-bg);font-size:13.5px;line-height:1.7}
+.sh-prompt{position:relative;border:1px solid var(--sh-line);border-radius:10px;background:var(--sh-bg)}
+.sh-prompt pre{margin:0;padding:44px 14px 14px;max-height:280px;overflow:auto;white-space:pre-wrap;font-family:var(--sh-mono);font-size:12.5px;line-height:1.6}
+.sh-prompt .sh-btn{position:absolute;top:8px;right:8px;background:var(--sh-panel)}
+.sh-tw{overflow-x:auto;border:1px solid var(--sh-line);border-radius:10px}
+.sh-tw table{width:100%;min-width:560px;border-collapse:collapse;font-size:13.5px}
+.sh-tw th,.sh-tw td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--sh-line)}
+.sh-tw th{border-top:0;font-size:12px;color:var(--sh-muted);background:var(--sh-bg)}
+.sh-tag{display:inline-block;font-size:11.5px;font-weight:700;padding:0 7px;border-radius:999px;border:1px solid var(--sh-warn);color:var(--sh-warn)}
+.sh-msg{font-size:12.5px;color:var(--sh-ok)}
+.sh-msg:empty{display:none}
+.sh-due{font-weight:700;color:var(--sh-bad)}
+.sh-guide{gap:22px}
+.g-lead{font-size:15.5px;line-height:1.65}
+.g-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.g-fact{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--sh-line);border-radius:12px;background:var(--sh-bg);min-width:0}
+.g-fact span{font-size:12px;font-weight:600;color:var(--sh-muted)}
+.g-fact b{font-size:19px;line-height:1.35}
+.g-fact small{font-size:12px;color:var(--sh-muted);line-height:1.5}
+.g-fact.is-due{border-color:var(--sh-bad);background:var(--sh-bad-soft)}
+.g-fact.is-due b{color:var(--sh-bad)}
+.g-sec{display:flex;flex-direction:column;gap:10px}
+.g-sec h3{display:flex;align-items:baseline;gap:8px;font-size:16px}
+.g-sec h3 em{font-style:normal;font-size:12px;font-weight:600;color:var(--sh-muted)}
+.g-sub{font-size:13px;color:var(--sh-muted)}
+.sh-dlg-body ul.g-check{list-style:none;padding:12px 14px;gap:6px;border:1px solid var(--sh-accent);border-radius:12px;background:color-mix(in srgb,var(--sh-accent) 8%,transparent)}
+.g-check li{position:relative;padding-left:26px;line-height:1.6}
+.g-check li::before{content:"";position:absolute;left:0;top:3px;width:16px;height:16px;border:1.5px solid var(--sh-accent);border-radius:5px}
+.g-fb{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.g-card{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--sh-line);border-radius:12px;min-width:0}
+.g-k{font-size:14.5px;font-weight:700}
+.g-card p{font-size:13px;line-height:1.55}
+.g-was{color:var(--sh-muted)}
+.g-was::before{content:"5차  ";font-weight:700;font-size:11.5px;color:var(--sh-bad)}
+.g-now{font-weight:600}
+.g-now::before{content:"이번  ";font-weight:700;font-size:11.5px;color:var(--sh-ok)}
+.g-where{align-self:flex-start;margin-top:auto;font-size:11.5px;font-weight:600;color:var(--sh-accent);border:1px solid var(--sh-line);border-radius:999px;padding:1px 9px}
+.sh-dlg-body ol.g-rules.g-steps{grid-template-columns:1fr}
+.sh-dlg-body ol.g-rules{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;counter-reset:r}
+.g-rules li{counter-increment:r;display:grid;grid-template-columns:24px 1fr;column-gap:10px;padding:10px 12px;border:1px solid var(--sh-line);border-radius:10px;min-width:0}
+.g-rules li::before{content:counter(r);grid-row:span 2;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--sh-fg);color:var(--sh-panel);font-size:12px;font-weight:700}
+.g-rules b{font-size:14px;line-height:1.5}
+.g-rules span{font-size:12.5px;color:var(--sh-muted);line-height:1.55}
+.g-more summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sh-accent)}
+.g-more .sh-ex{margin-top:8px}
+.g-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g-board div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;background:var(--sh-bg);min-width:0}
+.g-board b{font-size:13.5px}
+.g-board span{font-size:12.5px;color:var(--sh-muted);line-height:1.5}
+@media (max-width:640px){.g-facts,.g-board,.sh-dlg-body ol.g-rules{grid-template-columns:1fr}}
+#sh-ho .sh-body{gap:14px}
+body.sh-full .sh-stage{position:fixed;inset:32px 0 0 0;z-index:80;padding:0;background:var(--sh-bg);overflow-x:hidden;overflow-y:auto}
+body.sh-full #sh-stage-top{display:none}
+body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:calc(100vh - 32px)}
+#sh-fullbar{position:fixed;left:0;right:0;top:0;height:32px;z-index:81;display:flex;align-items:center;gap:8px;padding:0 max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));background:var(--sh-panel);border-bottom:1px solid var(--sh-line);font-size:12px;color:var(--sh-muted)}
+#sh-fullbar[hidden]{display:none!important}
+#sh-fullbar-t{margin-right:auto}
+#sh-fullbar .k{font-family:var(--sh-mono);font-size:11px;border:1px solid var(--sh-line);border-radius:4px;padding:0 4px}
+#sh-full-close{font:inherit;font-size:12px;font-weight:600;padding:2px 10px;border:1px solid var(--sh-line);border-radius:6px;background:transparent;color:var(--sh-fg);cursor:pointer}
+#sh-full-close:hover{border-color:var(--sh-accent)}
+#sh-full-close:focus-visible{outline:2px solid var(--sh-accent);outline-offset:1px}
+.ho-exf{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--sh-line);border-radius:10px}
+.ho-exf b{font-size:14px}
+.ho-exf p{margin:0;font-size:13.5px;line-height:1.7;color:var(--sh-fg)}
+#sh-ho-exdlg .sh-hint{margin:0;font-size:13px;color:var(--sh-muted)}
+.dec-item{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--sh-line);border-radius:10px;font-size:13px;line-height:1.6}
+.dec-item .meta{font-size:11.5px;color:var(--sh-muted);font-weight:600}
+.dec-item .q{color:var(--sh-muted)}
+.dec-item .dv{font-weight:700}
+.dec-item .wy{font-size:12.5px}
+.dec-item .wy b{font-weight:600;color:var(--sh-muted);margin-right:4px}
+.ho-scr{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sh-muted)}
+.ho-scr select{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--sh-fg);background:var(--sh-panel);border:1px solid var(--sh-line);border-radius:8px;padding:6px 8px}
+.ho-f{display:flex;flex-direction:column;gap:4px}
+.ho-f label{font-size:13.5px;font-weight:700}
+.ho-f label .n{color:var(--sh-muted);font-weight:600;margin-right:4px}
+.ho-f .d{margin:0;font-size:12px;line-height:1.55;color:var(--sh-muted)}
+.ho-f textarea{font:inherit;font-size:13px;line-height:1.65;color:var(--sh-fg);background:var(--sh-bg);border:1px solid var(--sh-line);border-radius:8px;padding:8px 10px;min-height:168px;resize:vertical}
+.ho-f textarea:focus-visible,.ho-scr select:focus-visible{outline:2px solid var(--sh-accent);outline-offset:1px}
+.ho-f textarea:disabled{opacity:.6}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<!-- ===== BOARD SHELL 끝 ===== -->
+
+<!-- ===== 디자인 시스템 토큰: Figma 변수에서 옮긴 값만 (--ds-*) ===== -->
+<style id="ds">
+:root{
+  /* Figma 링크를 받으면 Claude가 변수를 읽어 여기에 채워요. 예) --ds-color-primary: …; */
+}
+</style>
+
+<!-- ===== 화면 · 컴포넌트 CSS: --ds- 토큰만 써서 ===== -->
+<style id="proto-css">
+</style>
+
+<!-- ===== BOARD SHELL: 수정 금지 (상단 바) ===== -->
+<div id="sh-bar">
+  <span class="sh-title">TripPin 마무리 과제<small>신민철</small></span>
+  <div class="sh-tabs" role="tablist">
+    <button type="button" class="sh-tab" role="tab" id="sh-tab-ds" aria-selected="false" aria-controls="sh-ds-view">디자인 시스템</button>
+    <button type="button" class="sh-tab" role="tab" id="sh-tab-design" aria-selected="true" aria-controls="sh-design-view">디자인</button>
+  </div>
+  <button type="button" class="sh-count" id="sh-hardcount" title="디자인 시스템 토큰 밖에서 직접 적은 값">하드코딩 —</button>
+  <button type="button" class="sh-count" id="sh-nodscount" title="Figma에서 디자인 시스템 컴포넌트가 아닌 요소">DS 아님 —</button>
+  <button type="button" class="sh-btn" id="sh-insp-btn" aria-pressed="false">인스펙터</button>
+  <button type="button" class="sh-btn" id="sh-dec-btn" aria-pressed="false">결정 기록</button>
+  <button type="button" class="sh-btn" id="sh-ho-btn" aria-pressed="false">Handoff</button>
+  <button type="button" class="sh-btn" id="sh-guide-btn">과제 안내</button>
+</div>
+<!-- ===== BOARD SHELL 끝 ===== -->
+
+<!-- ===== 디자인 시스템 탭 ===== -->
+<div class="sh-view" id="sh-ds-view" role="tabpanel" aria-labelledby="sh-tab-ds" hidden>
+  <nav class="sh-nav" id="sh-dsnav" aria-label="디자인 시스템 목록"></nav>
+  <div id="sh-ds-main">
+  <div class="sh-sec" id="sh-sec-foundation">
+    <h2>Foundation</h2>
+    <p class="sh-sub">Figma 변수에서 옮긴 토큰이에요. 보드가 종류별로 자동으로 그려요.</p>
+    <div class="sh-tokens" id="sh-tokens"></div>
+  </div>
+  <div class="sh-sec" id="sh-sec-component">
+    <h2>Component</h2>
+    <p class="sh-sub">Figma의 디자인 시스템 컴포넌트예요. 묶음(Input · Selection · Display · Feedback · Navigation …)별로 모여 있어요. 화면은 이것과 토큰으로 만들어요.</p>
+    <!-- 컴포넌트: Claude가 여기에 <div data-ds="text field" data-ds-title="텍스트 필드" data-ds-group="Input">…</div> 로 하나씩, 묶음 순서대로 -->
+    <section id="ds-components">
+    </section>
+  </div>
+  </div>
+</div>
+
+<!-- ===== 디자인 탭 ===== -->
+<div class="sh-view" id="sh-design-view" role="tabpanel" aria-labelledby="sh-tab-design">
+  <nav class="sh-nav" id="sh-nav" aria-label="디자인 화면 목록"></nav>
+  <div class="sh-stage">
+    <div class="sh-stage-top" id="sh-stage-top"></div>
+    <!-- 화면: Claude가 여기에 <section class="screen" data-screen="01" data-title="여행 목록">…</section> 로 하나씩 -->
+    <main id="proto">
+    </main>
+    <div class="sh-emptybox" id="sh-empty" hidden>
+      <p><b>아직 화면이 없어요.</b> 「과제 안내」를 열어 순서대로 시작하세요.</p>
+      <p>Figma 링크를 주면 Claude가 먼저 「디자인 시스템」 탭을 채우고, 그다음 여기에 화면을 하나씩 만들어요.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 화면 동작: Claude가 여기에만 (입력값 반영, 계산 등). data-go 이동은 보드가 처리해요 -->
+<script id="proto-js">
+</script>
+
+<!-- 결정 기록: [{"date":"11.24","screen":"화면 이름","question":"Claude가 물은 것","decision":"민철이 고른 것·말한 것 그대로","why":"민철이 말한 이유 그대로"}] -->
+<script type="application/json" id="decisions">[]</script>
+<!-- 허락받은 하드코딩 예외: [{"selector":".logo","prop":"width","why":"…","approved":"11.24 민철"}] -->
+<script type="application/json" id="exceptions">[]</script>
+
+<!-- ===== BOARD SHELL: 수정 금지 (인스펙터 · 다이얼로그 · 스크립트) ===== -->
+<div id="sh-fullbar" hidden><span id="sh-fullbar-t">전체 화면 · 프로토타입</span><span class="k">Esc</span><button type="button" id="sh-full-close" aria-label="전체 화면 닫기">닫기</button></div>
+<aside id="sh-insp" hidden aria-label="인스펙터">
+  <header><b>인스펙터</b><button type="button" class="sh-btn" id="sh-up">상위 영역</button><button type="button" class="sh-btn" id="sh-insp-close">닫기</button></header>
+  <div class="sh-body" id="sh-insp-body"></div>
+</aside>
+<aside id="sh-ho" hidden aria-label="Handoff">
+  <header><b>Handoff</b><button type="button" class="sh-btn" id="sh-ho-ex">예시 보기</button><button type="button" class="sh-btn" id="sh-ho-close">닫기</button></header>
+  <div class="sh-body">
+    <p class="sh-hint">화면마다 민철님이 직접 적어요. 적으면 바로 저장되고, 보드를 보는 사람 모두에게 보여요.</p>
+    <label class="ho-scr"><span>화면</span><select id="sh-ho-screen"></select></label>
+    <div id="sh-ho-fields"></div>
+    <p class="sh-hint" id="sh-ho-status" role="status" aria-live="polite"></p>
+  </div>
+</aside>
+<dialog class="sh-dlg" id="sh-ho-exdlg" aria-labelledby="sh-ho-ex-t">
+  <div class="sh-dlg-top"><h2 id="sh-ho-ex-t">Handoff 예시 · 카페 주문 화면 (음료 옵션)</h2><button type="button" class="sh-btn" data-close>닫기</button></div>
+  <div class="sh-dlg-body">
+    <p class="sh-hint">TripPin과 상관없는 예시예요(5번은 「이전 시안보다」로 바꿔 적었어요). 칸마다 이 정도로 적으면 개발자가 디자인을 열어 보지 않아도 화면을 만들 수 있어요. 숫자 · 조건 · 다음 화면을 구체적으로 쓰는 게 핵심이에요.</p>
+    <div class="ho-exf"><b>1. 이 화면은 무엇인가요</b><p>카페 앱에서 고른 음료의 옵션(사이즈 · 샷 · 얼음)을 정하고 장바구니에 담는 화면이에요.</p></div><div class="ho-exf"><b>2. 언제 나타나나요</b><p>메뉴 목록에서 음료 카드를 누르면 열려요. 장바구니에서 담은 음료의 「옵션 변경」을 눌러도 같은 화면이 열리고, 이때는 고른 옵션이 미리 선택돼 있어요.</p></div><div class="ho-exf"><b>3. 동작 규칙</b><p>• 사이즈를 바꾸면 가격이 바로 바뀌어요 (Tall 4,500원 · Grande +500원 · Venti +1,000원).<br>• 샷 추가는 1개당 +500원, 최대 3개까지. 3개가 되면 + 버튼이 비활성으로 바뀌어요.<br>• 수량을 바꾸면 아래 「담기」 버튼의 금액이 (음료 가격 × 수량)으로 바뀌어요.<br>• 「담기」를 누르면 「장바구니에 담았어요」 토스트가 뜨고 메뉴 목록으로 돌아가요. 위쪽 장바구니 숫자가 1 늘어요.<br>• 품절인 옵션은 회색으로 보이고 누를 수 없어요.<br>• 엣지케이스: 음료 이름이 길면 두 줄까지 보이고 나머지는 … 처리.</p></div><div class="ho-exf"><b>4. 디자인 결정 이유</b><p>• 가격을 「담기」 버튼 안에 넣었어요. 옵션을 바꿀 때마다 눈이 가는 곳에서 금액이 바뀌어야 실수로 비싼 옵션을 담지 않아요.<br>• 사이즈는 셀렉트 대신 칩 3개로 했어요. 고를 게 세 개뿐이라 한눈에 보이는 게 빨라요 (결정 기록 11.24).<br>• 샷 최대 3개는 매장 정책이에요. 막힌 이유를 알 수 있게 + 버튼 아래에 「최대 3샷」을 작게 적었어요.</p></div><div class="ho-exf"><b>5. 이전보다 나아진 점</b><p>• 이전 시안은 옵션을 바꿔도 가격이 그대로였어요. 이제 사이즈 · 샷 · 수량에 따라 「담기」 금액과 장바구니 숫자가 바로 바뀌어요 (화면끼리 값이 이어짐).<br>• 쓰지 않던 색 토큰 12개를 빼고, 이 화면에 쓰는 것만 남겼어요.<br>• 「담기」를 누른 뒤 어디로 가는지 없던 것을 메뉴 목록 + 토스트로 정했어요.</p></div>
+  </div>
+</dialog>
+
+<aside id="sh-decp" hidden aria-label="결정 기록">
+  <header><b>결정 기록</b><button type="button" class="sh-btn" id="sh-dec-close">닫기</button></header>
+  <div class="sh-body" id="sh-dec-body"></div>
+</aside>
+
+<dialog class="sh-dlg" id="sh-guide" aria-labelledby="sh-guide-t">
+  <div class="sh-dlg-top"><h2 id="sh-guide-t">과제 안내 · TripPin 마무리 과제</h2><button type="button" class="sh-btn" data-close>닫기</button></div>
+  <div class="sh-dlg-body sh-guide">
+    <p class="g-lead">5차 Figma 디자인을 Claude Code와 함께 <b>눌러지는 HTML 프로토타입</b>으로 만들어요. 코드는 Claude, 결정은 민철님. 마무리 과제라 <b>포트폴리오</b>로 쓸 수 있게 다듬어요.</p>
+
+    <div class="g-facts">
+      <div class="g-fact is-due"><span>마감</span><b>11.27 (금)</b><small>늦어지면 미리 알리기</small></div>
+      <div class="g-fact"><span>범위</span><b>5차 작업물 전체</b><small>5차에 그린 화면을 이어서 동작하게</small></div>
+      <div class="g-fact"><span>고쳐도 되는 것</span><b>디자인 시스템 · 디자인</b><small>디자인 시스템 기준으로 · 이유는 결정 기록에</small></div>
+    </div>
+
+    <section class="g-sec">
+      <h3>합격선 <em>4개 모두</em></h3>
+      <ul class="g-check">
+        <li>5차보다 <b>눈에 띄게 나아짐</b> · 화면마다 Handoff 「5차보다 나아진 점」에 적혀 있음</li>
+        <li>5차 화면이 <b>처음부터 끝까지 이어져</b> 프로토타입으로 보기에서 눌러 진행</li>
+        <li>인스펙터 <b>하드코딩 0</b> · 「DS 아님」은 이유를 말할 수 있음</li>
+        <li><b>결정 기록</b>에 민철님이 정한 이유가 한 줄씩</li>
+      </ul>
+    </section>
+
+    <section class="g-sec">
+      <h3>작업 방식 및 순서</h3>
+      <ol class="g-rules g-steps"><li><b>프롬프트 던지기</b><span>Claude Code에서 레포 ppfmh/trippin-work-board 를 고르고(Figma 연결도 켜고) 새 대화를 열어요. 맨 아래 「시작 프롬프트」를 복사해 붙여 넣고, [Figma 링크]를 채워 보내요. Claude가 레포의 보드 파일을 읽고 규칙대로 시작하고, 고친 것은 레포에 올려요. 이 링크에는 팀장 쪽에서 1시간 안에 반영돼요. 다음 날 새 대화로 이어서 할 때도 같은 프롬프트를 붙여 넣으면 어디까지 했는지 알려 주고 이어서 해요.</span></li><li><b>토큰</b><span>Claude가 Figma 변수를 토큰으로 옮겨요. 이상한 이름 · 겹치는 값은 선택 창으로 물어요. 고르고 이유를 한 줄 말하면 결정 기록에 그대로 남아요. 화면과 컴포넌트 변형에서 안 쓰는 토큰은 빼요.</span></li><li><b>컴포넌트</b><span>DS 컴포넌트를 변형(hover · pressed · selected · focus · disabled …)까지 전부 넣어요. Figma 섹션대로 Input · Selection · Display · Feedback · Navigation 묶음으로 정리되고, 디자인 시스템 탭 왼쪽 목록에서 볼 수 있어요.</span></li><li><b>디자인 시스템 확인</b><span>디자인 시스템 탭을 직접 보고 「확인했어」라고 말해야 화면을 시작해요. 이상하면 이때 고쳐 달라고 하세요.</span></li><li><b>화면 만들기</b><span>Figma 화면 링크를 하나씩 주면 한 화면씩 만들어요. 컴포넌트를 써서 마우스 올림 · 누름이 Figma대로 바뀌어요. Figma에서 DS가 아닌 요소는 그대로 만들고 「DS 아님」으로 표시돼요. 고칠지는 민철님이 정해요.</span></li><li><b>동작 지시</b><span>"이 버튼 누르면 일정 화면"처럼 말로 지시해요. 이동할 화면 · 상태 · 문구가 Figma에 없으면 Claude가 선택 창으로 물어요. 5차 화면들이 값과 흐름으로 이어지게(합계 · 위쪽 요약 · 저장 뒤 상태) 만드는 게 목표예요.</span></li><li><b>엣지케이스</b><span>화면마다 비어 있음 · 긴 글자 · 오류 · 불러오는 중 · 겹침 등을 선택 창으로 물어요. 추가하면 그 화면 아래 「엣지」 탭으로 보여요.</span></li><li><b>확인하고 고치기</b><span>「프로토타입으로 보기」 · 「전체 화면으로 보기」로 처음부터 끝까지 눌러 봐요. 인스펙터로 하드코딩 · DS 아님을 직접 찾아 「이 요소의 이 값을 이렇게」 하나씩 말해요. "다 찾아서 없애줘", "한번에 알아서 다 고쳐줘"는 거절해요. 직접 발견한 건 언제든 고쳐 달라고 하면 돼요.</span></li><li><b>디자인 다듬기</b><span>포트폴리오로 쓸 수 있게 디자인 시스템과 화면을 고쳐도 돼요. 디자인 시스템을 먼저 고치고 화면에 적용하고, Figma와 달라진 점과 이유는 결정 기록에 남아요.</span></li><li><b>Handoff 쓰기</b><span>화면마다 오른쪽 「Handoff」에 5칸을 직접 써요(무엇 · 언제 · 동작 규칙 · 결정 이유 · 5차보다 나아진 점). Claude는 대신 써 주지 않아요. 「예시 보기」를 참고하세요.</span></li><li><b>제출 전 점검</b><span>아래 「제출할 것」을 하나씩 체크해요. 늦어질 것 같으면 11.27 전에 「한 것 · 남은 것」을 먼저 알려 주세요.</span></li></ol>
+      <details class="g-more"><summary>Claude가 묻는 모습 보기</summary>
+        <div class="sh-ex">선택 창에 질문 하나가 떠요: 「저장 뒤에 보여 줄 화면이 없습니다. 어떻게 할까요?」<br>[일정 화면으로 돌아가기] [토스트만 띄우고 그대로] [새 화면이 필요함] [기타 · 직접 쓰기]<br>고르면 「왜 이걸 골랐어요?」 한 줄을 더 물어요.</div>
+      </details>
+    </section>
+
+    <section class="g-sec">
+      <h3>보드 구성</h3>
+      <div class="g-board">
+        <div><b>디자인 시스템 탭</b><span>왼쪽 목록: Foundation(color · typography · spacing …) · Component(input · display · feedback …)</span></div>
+        <div><b>디자인 탭</b><span>화면 목록 · 엣지케이스 탭 · 프로토타입으로 보기</span></div>
+        <div><b>인스펙터</b><span>토큰인지 하드코딩인지, DS인지</span></div>
+        <div><b>결정 기록</b><span>민철님이 고른 것 · 말한 이유를 Claude가 그대로 적음</span></div>
+        <div><b>Handoff</b><span>화면마다 민철님이 직접 쓰는 설명 5칸</span></div>
+      </div>
+    </section>
+
+    <section class="g-sec">
+      <h3>제출할 것 <em>11.27 금</em></h3>
+      <ul class="g-check">
+        <li>이 보드: DS 탭 + 5차 화면 · 엣지케이스 + 끝까지 동작</li>
+        <li>하드코딩 0 (예외는 목록) · 결정 기록</li>
+        <li>화면마다 Handoff 5칸 (무엇 · 언제 · 동작 규칙 · 결정 이유 · 5차보다 나아진 점)</li>
+        <li>Figma에서 바꾼 디자인 시스템 · 디자인이 있으면 무엇을 왜 (결정 기록) · 포트폴리오에 쓸 수 있게</li>
+      </ul>
+    </section>
+
+    <section class="g-sec">
+    <h3 id="g-prompt">시작 프롬프트 · Claude Code에 붙여 넣기</h3>
+    <p class="g-sub">Claude Code에서 레포 ppfmh/trippin-work-board 를 고르고 Figma 연결을 켠 새 대화 맨 처음에 붙여 넣고, [Figma 링크]만 채워요.</p>
+    <div class="sh-prompt"><button type="button" class="sh-btn" id="sh-copy">복사</button><pre id="sh-prompt-text">너는 신민철(주니어 디자이너)과 함께 TripPin 일정 화면을 동작하는 HTML 프로토타입으로 만드는 파트너야. 작업 장소는 GitHub 레포 ppfmh/trippin-work-board 의 board.html(작업 보드)이고, 먼저 그 파일과 CLAUDE.md 를 읽은 뒤 맨 위 「Claude에게」 주석의 규칙을 그대로 따른다. 코드는 네가 쓰지만 디자인과 동작 결정은 전부 민철이 한다.
+
+[자료]
+- 작업 보드(원본): 레포 ppfmh/trippin-work-board 의 board.html
+- 보드 보기(팀장님과 같이 보는 링크): https://claude.ai/artifact/Pi7Fvha6sZdYT568943z2R
+- Figma 파일: [Figma 링크]
+- 범위: 5차 과제에서 그린 화면 전부. 화면끼리 값과 흐름이 이어지게 만든다. 새 화면 · 새 기능은 만들지 않고 필요하면 묻는다
+
+[순서]
+1. 순서는 토큰 → 컴포넌트(변형 전부) → 민철 확인 → 화면. 디자인 시스템 먼저: Figma 변수(색·글자·간격·모서리)를 style#ds 에 --ds- 토큰으로, DS 컴포넌트를 section#ds-components 에 data-ds="이름" 으로, 변형(hover·pressed·selected·focus·disabled 등) 전부를 변형 × 상태 표로 넣는다. 카드마다 data-ds-group 을 Figma components 섹션대로 Input · Selection · Display · Feedback · Navigation(제품 전용 섹션은 맨 뒤) 중 하나로 붙이고, 묶음 순서대로 · 묶음 안은 작은 것부터 놓는다. 이름·값은 Figma 그대로. 「안 쓰는 토큰」은 화면과 컴포넌트 변형을 함께 보고 정한다. 이상한 이름이나 같은 뜻 두 값은 목록으로 보여 주고 Figma를 고칠지 묻는다. 민철이 확인하기 전에는 화면을 만들지 않는다.
+2. 화면 구성: 민철이 「확인했어」라고 한 뒤에 시작한다. 민철이 주는 Figma 화면 링크 순서대로 한 화면씩, 그 컴포넌트로 만들어(프로토타입에서 hover·누름·포커스가 변형대로 바뀌게) &lt;section class="screen" data-screen="번호" data-title="이름"&gt; 으로 만든다. --ds- 토큰만 쓴다. 고칠 자리는 글자가 아니라 실제 태그 줄로 찾고, 고친 뒤 보드가 정상인지 확인한다.
+3. Figma에서 DS 컴포넌트가 아닌 요소는 DS로 바꾸지 말고 그대로 구현한다. data-figma="레이어 이름" 만 붙이고 data-ds 는 붙이지 않는다.
+3-1. 보드에 불러온 디자인 시스템과 화면은 민철이 고쳐도 된다(마무리 과제, 포트폴리오용). 민철이 말하면 고친다. 화면은 디자인 시스템 기준으로 고치고(새 값은 토큰·컴포넌트부터), 네가 먼저 고치자고 하지 않는다. Figma와 달라진 점과 민철의 이유를 결정 기록에 그대로 남긴다.
+4. 동작은 민철이 말로 지시한 대로 만든다. 화면 이동은 data-go="화면 번호", 그 밖의 동작은 &lt;script id="proto-js"&gt; 에.
+5. 엣지케이스: 한 화면을 만들 때마다 생길 수 있는 엣지케이스(비어 있음, 아주 긴 글자, 최대·0, 오류, 불러오는 중, 겹침 등)를 목록으로 보여 주고, 하나씩 추가할지와 어떻게 보일지 선택 창으로 선택지 + 「추가 안 함」 + 「기타」를 주고 묻는다. 추가하면 &lt;section class="edge" data-of="화면 번호" data-edge="영문 id" data-title="이름"&gt; 으로 만든다.
+
+[빠진 것은 묻는다]
+- 이동할 화면·과정·상태·요소·문구·값이 Figma에 없으면 스스로 설계하지 말고 "○○이(가) 없습니다. 어떻게 할까요?"로 묻는다.
+- 질문은 채팅에 늘어놓지 말고 선택 창(AskUserQuestion)으로 한 번에 하나씩 묻는다. 선택지 2–3개 + 「기타」. 추천하지 않는다.
+- 고른 뒤 "왜 이걸 골랐어요?"를 한 줄로 묻고, 답을 결정 기록(id="decisions")에 민철의 말 그대로 남긴다. 답을 받기 전에는 그 부분을 만들지 않는다.
+- 보고는 두세 줄로 짧게. 자세한 건 보드(디자인 시스템 탭 · 결정 기록)에서 보게 한다.
+- 결정 기록에는 민철이 고르거나 말한 것만 민철의 말 그대로 적는다. 요약하거나 바꿔 쓰지 않는다. 묻지 않고 정하지 않는다.
+- Handoff는 민철이 화면마다 직접 쓴다. 대신 써 주지 않는다.
+
+[거절한다]
+- "하드코딩 다 찾아서 없애줘", "DS 아닌 거 전부 바꿔줘", "한번에 알아서 다 고쳐줘" 같은 요청은 하지 않는다. 민철이 인스펙터로 직접 찾아 요소와 값을 하나씩 말하게 한다. 짚어 준 것은 고친다.
+- 네가 묻지 않은 것이라도 민철이 스스로 발견해 고치자고 하면 고친다(디자인 시스템 기준, 결정 기록에 이유).
+
+[게시 · 이어서 하기]
+- 고친 뒤에는 board.html 을 커밋하고 푸시한다. 커밋 메시지는 한국어로 무엇을 했는지 한 줄. 아티팩트에는 직접 게시하지 않는다(팀장 쪽에서 같은 링크에 올린다). BOARD SHELL 부분은 그대로 둔다.
+- 새 대화에서 이어서 할 때도 이 프롬프트를 그대로 붙여 넣는다. 그때는 레포를 최신으로 받고(git pull) board.html 을 읽어 디자인 시스템 · 화면 · 결정 기록이 어디까지 됐는지 두세 줄로 알려 주고, 다음에 할 단계를 선택 창으로 묻는다.
+
+한국어로, 쉬운 말로 짧게. 첫 답변에서는 보드를 읽었는지와 Figma 링크를 받았는지만 확인하고, 토큰부터 시작하겠다고 말한 뒤 바로 토큰을 옮긴다.</pre></div>
+    <p class="sh-msg" id="sh-copy-msg" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var proto=$('proto'), comps=$('ds-components'), body=document.body;
+  function readJSON(id){ try{ return JSON.parse($(id).textContent||'[]'); }catch(e){ return []; } }
+  var EXC=readJSON('exceptions');
+  function inScope(el){ return el && (proto.contains(el)||comps.contains(el)) && el!==proto && el!==comps; }
+
+  /* 탭 */
+  function showTab(id){
+    ['sh-tab-ds','sh-tab-design'].forEach(function(t){ var on=t===id; $(t).setAttribute('aria-selected',String(on)); $($(t).getAttribute('aria-controls')).hidden=!on; });
+    if(id==='sh-tab-ds'){ renderTokens(); renderDsNav(); }
+  }
+  $('sh-tab-ds').addEventListener('click',function(){ showTab('sh-tab-ds'); });
+  $('sh-tab-design').addEventListener('click',function(){ showTab('sh-tab-design'); });
+
+  /* 토큰 표 (자동) */
+  function renderTokens(){
+    var box=$('sh-tokens'); box.textContent='';
+    var src=($('ds')||{}).textContent||'', re=/^[ \t]*(--ds-[\w-]+)\s*:\s*([^;]+);[ \t]*(?:\/\*\s*([^*]*?)\s*\*\/)?/gm, m, toks=[];
+    while((m=re.exec(src))){ toks.push({v:m[1],val:m[2].trim(),f:(m[3]||'').replace(/\s*·.*$/,'')||m[1]}); }
+    if(!toks.length){ var e=document.createElement('div'); e.className='sh-emptybox'; e.innerHTML='<b>아직 토큰이 없어요.</b> Figma 링크를 주면 Claude가 Figma 변수를 여기에 옮겨요.'; box.appendChild(e); return; }
+    var el=function(t,c,x){ var n=document.createElement(t); if(c) n.className=c; if(x!=null) n.textContent=x; return n; };
+    var card=function(t,swatch){ var c=el('div','tg-c'); if(swatch){ var w=el('span','sw'); w.style.background='var('+t.v+')'; c.appendChild(w); } var tx=el('div','tx'); tx.appendChild(el('b','',t.f)); tx.appendChild(el('span','',t.val)); tx.appendChild(el('code','',t.v)); c.appendChild(tx); return c; };
+    var TG=[]; var group=function(title,nav){ var g=el('section','tg'); g.id='tg-'+TG.length; TG.push({id:g.id,name:nav||title}); g.appendChild(el('h3','',title)); box.appendChild(g); return g; };
+    var grid=function(g,sub,list,sw){ if(!list.length) return; if(sub) g.appendChild(el('h4','',sub)); var d=el('div','tg-grid'); list.forEach(function(t){ d.appendChild(card(t,sw)); }); g.appendChild(d); };
+    var ST={'':0,'hovered':1,'pressed':2}, ORD=['primary','secondary','tertiary','brand','selected','inverse','focusring','info','success','warning','danger','disabled'];
+    var key=function(t){ var last=t.f.split('/').pop(), mm=last.match(/^(.*?)(?:-(hovered|pressed|subtle))?$/), base=mm[1], st=mm[2]||''; var i=ORD.indexOf(base); return [(i<0?99:i),base,(st==='subtle'?3:ST[st]||0)]; };
+    var sortT=function(l){ return l.sort(function(x,y){ var a=key(x),b=key(y); return a[0]-b[0]||(a[1]<b[1]?-1:a[1]>b[1]?1:0)||a[2]-b[2]; }); };
+    var used={};
+    [['Color · text (글자 색)','color/text/','Color · text'],['Color · bg (배경 색)','color/bg/','Color · bg'],['Color · border (선 색)','color/border/','Color · border'],['Color · icon (아이콘 색)','color/icon/','Color · icon']].forEach(function(c){
+      var l=toks.filter(function(t){ return t.f.indexOf(c[1])===0; }); if(!l.length) return; l.forEach(function(t){used[t.v]=1;});
+      var g=group(c[0],c[2]);
+      grid(g,'기본',sortT(l.filter(function(t){ return t.f.indexOf('/interactive/')<0; })),true);
+      grid(g,'누르는 요소 (interactive) · 기본 → hovered → pressed',sortT(l.filter(function(t){ return t.f.indexOf('/interactive/')>=0; })),true);
+    });
+    var brand=toks.filter(function(t){ return /^color\/color\//.test(t.f); }); if(brand.length){ brand.forEach(function(t){used[t.v]=1;}); grid(group('Color · brand (브랜드 단계)','Color · brand'),'',brand,true); }
+    var ty=toks.filter(function(t){ return /^(Heading|Body)\//.test(t.f); });
+    if(ty.length){ ty.forEach(function(t){used[t.v]=1;}); var g=group('Typography (글자)','Typography'); var get=function(f){ var t=ty.filter(function(x){return x.f===f;})[0]; return t; };
+      var styles=[];
+      ty.forEach(function(t){ var mm=t.f.match(/^(Heading|Body)\/(\w+)\/font size$/); if(mm) styles.push([mm[1],mm[2]]); });
+      var rank={'4xl':0,'3xl':1,'2xl':2,xl:3,lg:4,md:5,sm:6,xs:7}; styles.sort(function(a,b){ return (a[0]===b[0]?0:(a[0]==='Heading'?-1:1))||rank[a[1]]-rank[b[1]]; });
+      styles.forEach(function(st){ var fs=get(st[0]+'/'+st[1]+'/font size'), lh=get(st[0]+'/'+st[1]+'/line height');
+        var fw=st[0]==='Heading'?(get('Heading/'+st[1]+'/font weight')||get('Heading/4xl/font weight')):get('Body/font weight/regular');
+        var r=el('div','tg-type'), tx=el('div','tx'); tx.appendChild(el('b','',st[0]+' / '+st[1])); tx.appendChild(el('span','',[fs&&fs.val,lh&&lh.val].filter(Boolean).join(' / ')+(fw?' · '+fw.val:''))); r.appendChild(tx);
+        var smp=el('div','','나의 여행 계획 TripPin 12,000'); smp.style.fontFamily='var(--ds-font-family)'; if(fs) smp.style.fontSize='var('+fs.v+')'; if(lh) smp.style.lineHeight='var('+lh.v+')'; if(fw) smp.style.fontWeight='var('+fw.v+')'; if(st[0]==='Heading'){ var ls=get('Heading/Letter spacing'); if(ls) smp.style.letterSpacing='var('+ls.v+')'; }
+        r.appendChild(smp); g.appendChild(r); });
+      grid(g,'굵기 · 자간',ty.filter(function(t){ return /weight|spacing/i.test(t.f); }),false);
+    }
+    var sp=toks.filter(function(t){ return /^spacing\/spacing\//.test(t.f); }).sort(function(a,b){ return parseFloat(a.val)-parseFloat(b.val); });
+    if(sp.length){ sp.forEach(function(t){used[t.v]=1;}); var g=group('Spacing (간격 · 막대는 실제의 8배)','Spacing'); sp.forEach(function(t){ var r=el('div','tg-sp'), l=el('div'); l.appendChild(el('b','',t.f)); l.appendChild(el('span','',t.val)); r.appendChild(l); var bar=el('div','bar'); bar.style.width='calc(var('+t.v+') * 8)'; bar.title='실제 크기의 8배'; r.appendChild(bar); g.appendChild(r); }); }
+    var rest=toks.filter(function(t){ return !used[t.v] && t.v!=='--ds-font-family'; });
+    if(rest.length){ var g=group('Radius · Border · Size (모서리 · 선 · 크기)','Radius · Size'); var d=el('div','tg-grid');
+      rest.sort(function(a,b){ var A=a.f.replace(/\/[^/]*$/,''),B=b.f.replace(/\/[^/]*$/,''); return A<B?-1:A>B?1:(parseFloat(a.val)-parseFloat(b.val)); }).forEach(function(t){ var c=card(t,false); if(/radius/.test(t.f)){ var r=el('span','tg-r'); r.style.borderRadius='var('+t.v+')'; c.insertBefore(r,c.firstChild); } d.appendChild(c); }); g.appendChild(d); }
+    var ff=toks.filter(function(t){ return t.v==='--ds-font-family'; })[0]; if(ff){ var g=group('Font (글꼴)','Font'); grid(g,'',[ff],false); }
+    window.__shTG=TG;
+  }
+  /* 디자인 시스템 왼쪽 목록: Foundation(토큰 묶음) · Component(묶음별 컴포넌트) */
+  var GROUP_ORDER=['Input','Selection','Display','Feedback','Navigation','Overlay','Layout'];
+  function renderDsNav(){
+    var nav=$('sh-dsnav'); if(!nav) return; nav.textContent='';
+    var main=$('sh-ds-main');
+    var go=function(id){ var t=document.getElementById(id); if(t) t.scrollIntoView({block:'start'}); };
+    var item=function(label,id,ct,sub){ var b=document.createElement('button'); b.type='button'; if(sub) b.className='sub'; b.appendChild(document.createTextNode(label)); if(ct!=null){ var c=document.createElement('span'); c.className='ct'; c.textContent=ct; b.appendChild(c); } b.addEventListener('click',function(){ go(id); }); nav.appendChild(b); };
+    var h=function(t,tag){ var e=document.createElement(tag||'h3'); e.textContent=t; nav.appendChild(e); };
+    h('Foundation'); var tg=window.__shTG||[];
+    if(!tg.length){ var n=document.createElement('div'); n.className='sh-none'; n.textContent='아직 토큰이 없어요.'; nav.appendChild(n); }
+    tg.forEach(function(g){ item(g.name,g.id,null,false); });
+    h('Component');
+    var cards=[].slice.call(comps.querySelectorAll(':scope > [data-ds]'));
+    cards.forEach(function(c){ if(!c.id) c.id='dsc-'+(c.dataset.ds||'').replace(/[^\w-]+/g,'-'); });
+    if(!cards.length){ var n2=document.createElement('div'); n2.className='sh-none'; n2.textContent='아직 컴포넌트가 없어요.'; nav.appendChild(n2); return; }
+    var groups={}, order=[];
+    cards.forEach(function(c){ var g=c.dataset.dsGroup||'기타'; if(!groups[g]){ groups[g]=[]; order.push(g); } groups[g].push(c); });
+    order.sort(function(a,b){ var ia=GROUP_ORDER.indexOf(a), ib=GROUP_ORDER.indexOf(b); ia=ia<0?(a==='기타'?999:50):ia; ib=ib<0?(b==='기타'?999:50):ib; return ia-ib; });
+    comps.querySelectorAll(':scope > .sh-ghead').forEach(function(e){ e.remove(); });
+    var prev=null; cards.forEach(function(c){ var g=c.dataset.dsGroup||'기타'; if(g!==prev){ var hd=document.createElement('h3'); hd.className='sh-ghead'; hd.id='dsg-'+g.replace(/[^\w-]+/g,'-'); hd.textContent=g; var sp=document.createElement('span'); sp.textContent=groups[g].length+'개'; hd.appendChild(sp); comps.insertBefore(hd,c); prev=g; } });
+    order.forEach(function(g){ h(g+' · '+groups[g].length,'h4'); groups[g].forEach(function(c){ item(c.dataset.dsTitle||c.dataset.ds,c.id,null,true); }); });
+  }
+
+  /* 화면 목록 · 프로토타입 */
+  var mode='proto', cur=null, curEdge=null, hist=[];
+  function edges(no){ return [].slice.call(proto.querySelectorAll(':scope > section.edge')).filter(function(e){ return e.dataset.of===no; }); }
+  function screens(){ return [].slice.call(proto.querySelectorAll(':scope > section.screen')); }
+  function renderNav(){
+    var nav=$('sh-nav'); nav.textContent='';
+    var pb=document.createElement('button'); pb.type='button'; pb.className='proto-btn'; pb.textContent='▶ 프로토타입으로 보기'; pb.setAttribute('aria-current',String(mode==='proto'));
+    pb.addEventListener('click',function(){ mode='proto'; hist=[]; var s=screens()[0]; cur=s?s.dataset.screen:null; show(); });
+    nav.appendChild(pb);
+    var h=document.createElement('h3'); h.textContent='디자인 화면'; nav.appendChild(h);
+    var list=screens();
+    if(!list.length){ var n=document.createElement('div'); n.className='sh-none'; n.textContent='아직 화면이 없어요.'; nav.appendChild(n); return; }
+    list.forEach(function(s){
+      var b=document.createElement('button'); b.type='button'; b.setAttribute('aria-current',String(mode==='screen'&&cur===s.dataset.screen));
+      var no=document.createElement('span'); no.className='no'; no.textContent=s.dataset.screen||''; b.appendChild(no);
+      b.appendChild(document.createTextNode(s.dataset.title||'(이름 없음)'));
+      var ne=edges(s.dataset.screen).length; if(ne){ var c=document.createElement('span'); c.className='ec'; c.textContent='엣지 '+ne; b.appendChild(c); }
+      b.addEventListener('click',function(){ mode='screen'; cur=s.dataset.screen; curEdge=null; show(); });
+      nav.appendChild(b);
+    });
+  }
+  function show(){
+    var list=screens(); $('sh-empty').hidden=list.length>0;
+    if(!cur && list[0]) cur=list[0].dataset.screen;
+    var eds=edges(cur); if(mode!=='screen' || !eds.some(function(e){return e.dataset.edge===curEdge;})) curEdge=null;
+    list.forEach(function(s){ s.classList.toggle('sh-on', s.dataset.screen===cur && !curEdge); });
+    [].forEach.call(proto.querySelectorAll(':scope > section.edge'),function(e){ e.classList.toggle('sh-on', mode==='screen' && e.dataset.of===cur && e.dataset.edge===curEdge); });
+    var top=$('sh-stage-top'); top.textContent='';
+    if(list.length){
+      var s=list.filter(function(x){return x.dataset.screen===cur;})[0];
+      var t=document.createElement('span'); t.innerHTML=(mode==='proto'?'<b>프로토타입</b> · 화면을 눌러 진행해요':'<b>디자인 화면</b>')+(s?' · '+(s.dataset.screen||'')+' '+(s.dataset.title||''):'');
+      top.appendChild(t);
+      if(mode==='proto'){
+        var back=document.createElement('button'); back.type='button'; back.className='sh-btn'; back.textContent='← 뒤로'; back.disabled=!hist.length;
+        back.addEventListener('click',function(){ cur=hist.pop()||cur; show(); }); top.appendChild(back);
+        var re=document.createElement('button'); re.type='button'; re.className='sh-btn'; re.textContent='처음부터';
+        re.addEventListener('click',function(){ hist=[]; cur=list[0].dataset.screen; show(); }); top.appendChild(re);
+        var fs=document.createElement('button'); fs.type='button'; fs.className='sh-btn'; fs.textContent='전체 화면으로 보기';
+        fs.addEventListener('click',function(){ setFull(true); }); top.appendChild(fs);
+      } else {
+        var tabs=document.createElement('div'); tabs.className='sh-edgetabs'; tabs.setAttribute('role','tablist');
+        var mk=function(lbl,val){ var b=document.createElement('button'); b.type='button'; b.setAttribute('role','tab'); b.setAttribute('aria-selected',String(curEdge===val)); b.textContent=lbl; b.addEventListener('click',function(){ curEdge=val; show(); }); tabs.appendChild(b); };
+        mk('디자인 화면',null);
+        eds.forEach(function(e){ mk('엣지 · '+(e.dataset.title||e.dataset.edge),e.dataset.edge); });
+        if(!eds.length){ var n=document.createElement('span'); n.className='sh-noedge'; n.textContent='엣지케이스 없음'; tabs.appendChild(n); }
+        top.appendChild(tabs);
+      }
+    }
+    if(cur!==show._last){ show._last=cur; var st=document.querySelector('.sh-stage'); if(st) st.scrollTop=0; }
+    renderNav();
+    document.dispatchEvent(new CustomEvent('proto:screen',{detail:{screen:cur,mode:mode}}));
+  }
+  /* 전체 화면 보기: 프로토타입을 100% 크기로, 오른쪽 위 닫기 · Esc */
+  function setFull(v){ body.classList.toggle('sh-full',v); $('sh-fullbar').hidden=!v; if(v){ var s0=proto.querySelector(':scope > .sh-on'); $('sh-fullbar-t').textContent='전체 화면 · '+((s0&&s0.dataset.title)||'프로토타입'); }  if(v){ if(insp) setInsp(false); if(window.shHoClose) window.shHoClose(); if(window.shDecClose) window.shDecClose(); $('sh-full-close').focus(); } }
+  $('sh-full-close').addEventListener('click',function(){ setFull(false); });
+  document.addEventListener('proto:screen',function(){ if(body.classList.contains('sh-full')){ var s0=proto.querySelector(':scope > .sh-on'); $('sh-fullbar-t').textContent='전체 화면 · '+((s0&&s0.dataset.title)||'프로토타입'); } });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape' && body.classList.contains('sh-full') && !document.querySelector('dialog[open]')) setFull(false); });
+  /* 화면 이동: data-go (프로토타입 모드, 인스펙터 꺼져 있을 때) */
+  proto.addEventListener('click',function(e){
+    if(insp || mode!=='proto') return;
+    var g=e.target.closest('[data-go]'); if(!g||!proto.contains(g)) return;
+    e.preventDefault(); var to=g.getAttribute('data-go'); if(to===cur) return;
+    if(!screens().some(function(s){return s.dataset.screen===to;})){ var m=document.createElement('span'); m.style.color='var(--sh-bad)'; m.textContent=' · 화면 '+to+'이(가) 아직 없어요'; $('sh-stage-top').appendChild(m); return; }
+    hist.push(cur); cur=to; show();
+  });
+  window.protoGo=function(to){ if(to&&to!==cur){ hist.push(cur); cur=to; show(); } };
+
+  /* 검사: 하드코딩 + DS 컴포넌트 아님 */
+  var WATCH=/^(color|background|background-color|border|border-(top|right|bottom|left)|border-(top|right|bottom|left)-(color|width)|border-color|border-width|outline|outline-color|font|font-size|font-weight|font-family|line-height|letter-spacing|padding|padding-(top|right|bottom|left)|margin|margin-(top|right|bottom|left)|gap|row-gap|column-gap|border-radius|border-(top|bottom)-(left|right)-radius|box-shadow|fill|stroke)$/;
+  var OK=/^(0|0px|auto|none|inherit|initial|unset|transparent|currentcolor|normal|100%|50%)$/i;
+  function decls(cssText){
+    var out=[], depth=0, buf='';
+    for(var i=0;i<cssText.length;i++){ var ch=cssText[i]; if(ch==='(')depth++; if(ch===')')depth--; if(ch===';'&&depth===0){out.push(buf);buf='';} else buf+=ch; }
+    if(buf.trim()) out.push(buf);
+    return out.map(function(d){ var k=d.indexOf(':'); return k<0?null:{prop:d.slice(0,k).trim().toLowerCase(),val:d.slice(k+1).replace(/!important/,'').trim()}; }).filter(Boolean);
+  }
+  function judge(prop,val){ if(!WATCH.test(prop)) return null; if(/var\(--ds-/.test(val)) return /var\(--(?!ds-)/.test(val)?'hard':'token'; if(OK.test(val)) return 'ok'; return 'hard'; }
+  function isExc(sel,prop){ return EXC.some(function(e){ return e.prop===prop && (e.selector===sel||e.selector==='*'); }); }
+  var CTRL='input,select,textarea,button,[role="button"],[role="textbox"],[role="combobox"],[role="checkbox"],[role="switch"],[role="tab"]';
+  function dsOf(el){ var d=el.closest('[data-ds]'); return d && (proto.contains(d)||comps.contains(d)) ? d : null; }
+  var hard=[], nods=[], byEl=new Map();
+  function scan(){
+    hard=[]; nods=[]; byEl=new Map();
+    document.querySelectorAll('.sh-hard,.sh-nods').forEach(function(e){ e.classList.remove('sh-hard','sh-nods'); });
+    var sheet=[].filter.call(document.styleSheets,function(s){return s.ownerNode&&s.ownerNode.id==='proto-css';})[0];
+    function add(el,rec){ if(!byEl.has(el)) byEl.set(el,[]); byEl.get(el).push(rec); if(rec.kind==='hard'){ hard.push(rec); el.classList.add('sh-hard'); } }
+    function walk(rules){ [].forEach.call(rules||[],function(r){
+      if(r.cssRules && !r.selectorText){ walk(r.cssRules); return; }
+      if(!r.selectorText||!r.style) return;
+      decls(r.style.cssText).forEach(function(d){ var j=judge(d.prop,d.val); if(!j) return;
+        var els=[]; try{ els=[].slice.call(proto.querySelectorAll(r.selectorText)).concat([].slice.call(comps.querySelectorAll(r.selectorText))); }catch(e){}
+        els.forEach(function(el){ add(el,{el:el,sel:r.selectorText,prop:d.prop,val:d.val,kind:(j==='hard'&&isExc(r.selectorText,d.prop))?'exc':j}); });
+      });
+    }); }
+    if(sheet){ try{ walk(sheet.cssRules); }catch(e){} }
+    [proto,comps].forEach(function(root){ root.querySelectorAll('[style]').forEach(function(el){ decls(el.getAttribute('style')).forEach(function(d){ var j=judge(d.prop,d.val); if(j) add(el,{el:el,sel:'(인라인 style)',prop:d.prop,val:d.val,kind:j}); }); }); });
+    /* DS 아님: 디자인 화면 안에서 data-figma 가 있는데 DS 컴포넌트 안이 아닌 요소 + DS 밖의 입력·버튼류 */
+    var seen=new Set();
+    proto.querySelectorAll('[data-figma],'+CTRL).forEach(function(el){
+      if(dsOf(el)) return; var top=el; var p=el.parentElement;
+      while(p && p!==proto){ if(p.hasAttribute('data-figma') && !dsOf(p)) top=p; p=p.parentElement; }
+      if(seen.has(top)) return; seen.add(top); nods.push(top); top.classList.add('sh-nods');
+    });
+    var hb=$('sh-hardcount'), nb=$('sh-nodscount'), any=proto.children.length||comps.children.length;
+    var hu={}; hard.forEach(function(h){ hu[h.sel+'|'+h.prop]=1; }); var hn=Object.keys(hu).length; hb.textContent='하드코딩 '+hn; hb.title='직접 적은 값 '+hn+'곳 (그 값이 걸린 요소 '+hard.length+'개)'; hb.className='sh-count'+(any?(hn?' is-bad':' is-ok'):'');
+    nb.textContent='DS 아님 '+nods.length; nb.className='sh-count'+(any?(nods.length?' is-nods':' is-ok'):'');
+  }
+
+  /* 인스펙터 */
+  var insp=false, picked=null, hoverEl=null;
+  function label(el){ var s=el.tagName.toLowerCase(); if(el.id) s+='#'+el.id; var c=[].filter.call(el.classList,function(x){return x.indexOf('sh-')!==0;}); if(c.length) s+='.'+c.join('.'); return s; }
+  function path(el){ var p=[]; var root=proto.contains(el)?proto:comps; var ed=el.closest&&el.closest('section.edge'); while(el && el!==root){ p.unshift(label(el)); el=el.parentElement; } return (root===proto?(ed?'디자인 · 엣지 '+(ed.dataset.title||ed.dataset.edge):'디자인'):'디자인 시스템')+' › '+p.join(' › '); }
+  var SHOW=['color','background-color','border-top-width','border-top-color','border-radius','font-family','font-size','font-weight','line-height','letter-spacing','padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-bottom','gap','width','height'];
+  var OK_KO={inherit:'부모 값 물려받음 (감싼 요소의 값을 그대로 씀)',initial:'처음 값으로 되돌림',unset:'정하지 않음 (물려받거나 처음 값)',transparent:'투명',none:'없음',auto:'자동 (내용에 맞춤)',currentcolor:'글자색과 같은 색',normal:'보통','0':'0 (없음)','0px':'0 (없음)','100%':'꽉 채움','50%':'절반'};
+  function okLabel(v){ return '허용 값 · '+(OK_KO[String(v).toLowerCase()]||'기본값'); }
+  function td(t,cls){ var c=document.createElement('td'); c.textContent=t; if(cls)c.className=cls; return c; }
+  function hint(t){ var p=document.createElement('p'); p.className='sh-hint'; p.textContent=t; return p; }
+  function renderPanel(){
+    var box=$('sh-insp-body'); box.textContent='';
+    var hu2={}; hard.forEach(function(h){ hu2[h.sel+'|'+h.prop]=1; }); box.appendChild(hint('하드코딩 '+Object.keys(hu2).length+'곳 · DS 아님 '+nods.length+'개. 요소를 누르거나 아래 목록을 눌러 보세요. Alt+클릭은 감싸는 영역.'));
+    if(picked){
+      var p=document.createElement('div'); p.className='sh-path'; p.textContent=path(picked); box.appendChild(p);
+      var d=dsOf(picked), badge=document.createElement('div');
+      var isNods=nods.some(function(n){return n===picked||n.contains(picked);});
+      if(d){ badge.innerHTML='<span class="badge ds"></span>'; badge.firstChild.textContent='디자인 시스템 컴포넌트 · '+(d.getAttribute('data-ds-title')||d.getAttribute('data-ds')); }
+      else if(isNods){ var f=(picked.closest('[data-figma]')||{}).getAttribute; badge.innerHTML='<span class="badge nods"></span>'; badge.firstChild.textContent='디자인 시스템 컴포넌트 아님'+(picked.closest('[data-figma]')?' · Figma: '+picked.closest('[data-figma]').getAttribute('data-figma'):''); }
+      if(badge.firstChild) box.appendChild(badge);
+      var recs=byEl.get(picked)||[];
+      var h=document.createElement('h4'); h.textContent='이 요소 자체에 적은 값'; box.appendChild(h);
+      if(!recs.length) box.appendChild(hint('검사하는 속성에 적은 값이 없어요.'));
+      else{ var t=document.createElement('table'); recs.forEach(function(r){ var tr=document.createElement('tr'); tr.appendChild(td(r.prop));
+        var v=td(r.val+'  ·  '+(r.kind==='token'?'토큰':r.kind==='exc'?'허락된 예외':r.kind==='ok'?okLabel(r.val):'하드코딩 (토큰 아님)'), r.kind==='token'?'tok':r.kind==='exc'?'exc':r.kind==='hard'?'hard':''); var src=document.createElement('div'); src.className='sh-src'; src.textContent=r.sel; v.appendChild(src); tr.appendChild(v); t.appendChild(tr); }); box.appendChild(t); }
+      /* 이 영역(컴포넌트) 안의 문제: 안쪽 요소의 하드코딩, DS가 아닌 컴포넌트 */
+      var inHard=hard.filter(function(f){ return f.el!==picked && picked.contains(f.el); });
+      var inNods=nods.filter(function(n){ return n!==picked && picked.contains(n); });
+      var hz=document.createElement('h4'); hz.textContent=(d?'이 컴포넌트':'이 영역')+' 안 · 하드코딩 '+inHard.length+'개 · DS 아님 '+inNods.length+'개'; box.appendChild(hz);
+      if(!inHard.length && !inNods.length){ if(picked.children.length) box.appendChild(hint('안쪽 요소는 모두 토큰과 DS 컴포넌트로 되어 있어요.')); }
+      else{
+        var lz=document.createElement('div'); lz.className='sh-list';
+        inNods.forEach(function(n){ var b=document.createElement('button'); b.type='button'; b.innerHTML='<span class="badge nods">DS 아님</span> '; b.appendChild(document.createTextNode(label(n)+(n.getAttribute('data-figma')?' · Figma: '+n.getAttribute('data-figma'):''))); b.addEventListener('click',function(){ reveal(n); pick(n); }); lz.appendChild(b); });
+        inHard.forEach(function(f){ var b=document.createElement('button'); b.type='button'; b.innerHTML='<span class="badge hardb">하드코딩</span> '; b.appendChild(document.createTextNode(label(f.el)+' · '+f.prop+': '+f.val)); b.addEventListener('click',function(){ reveal(f.el); pick(f.el); }); lz.appendChild(b); });
+        box.appendChild(lz);
+      }
+      var h2=document.createElement('h4'); h2.textContent='화면에 그려진 값'; box.appendChild(h2);
+      var cs=getComputedStyle(picked), t2=document.createElement('table');
+      SHOW.forEach(function(k){ var tr=document.createElement('tr'); tr.appendChild(td(k)); tr.appendChild(td(cs.getPropertyValue(k))); t2.appendChild(tr); }); box.appendChild(t2);
+    }
+    function listOf(title,items,fmt){ if(!items.length) return; var h=document.createElement('h4'); h.textContent=title; box.appendChild(h); var l=document.createElement('div'); l.className='sh-list';
+      items.forEach(function(it){ var el=it.el||it, b=document.createElement('button'); b.type='button'; b.textContent=fmt(it); b.addEventListener('click',function(){ reveal(el); pick(el); }); l.appendChild(b); }); box.appendChild(l); }
+    listOf('하드코딩',hard,function(f){ return label(f.el)+'  —  '+f.prop+': '+f.val; });
+    listOf('디자인 시스템 컴포넌트 아님',nods,function(el){ return label(el)+(el.getAttribute('data-figma')?'  —  Figma: '+el.getAttribute('data-figma'):''); });
+  }
+  function reveal(el){
+    if(comps.contains(el)) showTab('sh-tab-ds'); else { showTab('sh-tab-design'); var s=el.closest('section.screen'), ed=el.closest('section.edge');
+      if(ed){ mode='screen'; cur=ed.dataset.of; curEdge=ed.dataset.edge; show(); }
+      else if(s && (s.dataset.screen!==cur || curEdge)){ mode='screen'; cur=s.dataset.screen; curEdge=null; show(); } }
+    el.scrollIntoView({block:'center',behavior:'smooth'});
+  }
+  function pick(el){ if(picked) picked.classList.remove('sh-pick'); picked=el; if(el) el.classList.add('sh-pick'); renderPanel(); }
+  function setInsp(v){
+    insp=v; $('sh-insp-btn').setAttribute('aria-pressed',String(v)); $('sh-insp').hidden=!v; body.classList.toggle('sh-insp',v); if(v){ if(window.shHoClose) window.shHoClose(); if(window.shDecClose) window.shDecClose(); } if(window.shSync) window.shSync();
+    if(!v){ pick(null); if(hoverEl){hoverEl.classList.remove('sh-hover');hoverEl=null;} } else { scan(); renderPanel(); }
+  }
+  $('sh-insp-btn').addEventListener('click',function(){ setInsp(!insp); });
+  $('sh-insp-close').addEventListener('click',function(){ setInsp(false); });
+  $('sh-hardcount').addEventListener('click',function(){ setInsp(true); });
+  $('sh-nodscount').addEventListener('click',function(){ setInsp(true); });
+  $('sh-up').addEventListener('click',function(){ if(picked && inScope(picked.parentElement)) pick(picked.parentElement); });
+  document.addEventListener('mouseover',function(e){ if(!insp) return; if(hoverEl) hoverEl.classList.remove('sh-hover'); hoverEl=inScope(e.target)?e.target:null; if(hoverEl) hoverEl.classList.add('sh-hover'); });
+  document.addEventListener('click',function(e){ if(!insp || !inScope(e.target)) return; e.preventDefault(); e.stopPropagation(); pick(e.altKey && inScope(e.target.parentElement) ? e.target.parentElement : e.target); },true);
+
+  /* 결정 기록 */
+  function renderDecisions(){
+    var box=$('sh-dec-body'), rows=readJSON('decisions'); box.textContent='';
+    if(!rows.length){ box.appendChild(hint('아직 결정이 없어요. Claude가 묻고 민철님이 고르거나 말할 때마다, Claude가 그 말을 그대로 여기에 적어요.')); return; }
+    box.appendChild(hint('결정 '+rows.length+'개 · 민철님이 고르고 말한 것을 Claude가 그대로 적었어요. 최신이 위.'));
+    rows.slice().reverse().forEach(function(r){
+      var it=document.createElement('div'); it.className='dec-item';
+      var add=function(cls,txt,lbl){ if(!txt) return; var p=document.createElement('div'); p.className=cls; if(lbl){ var b=document.createElement('b'); b.textContent=lbl; p.appendChild(b); } p.appendChild(document.createTextNode(txt)); it.appendChild(p); };
+      add('meta',[r.date,r.screen].filter(Boolean).join(' · '));
+      add('q',r.question,'');
+      add('dv',r.decision);
+      add('wy',r.why,'이유');
+      box.appendChild(it);
+    });
+  }
+  function syncSide(){ body.classList.toggle('sh-side', !$('sh-insp').hidden || !$('sh-ho').hidden || !$('sh-decp').hidden); }
+  var decOpen=false;
+  function decSet(v){ decOpen=v; $('sh-decp').hidden=!v; $('sh-dec-btn').setAttribute('aria-pressed',String(v)); if(v){ if(insp) setInsp(false); if(window.shHoClose) window.shHoClose(); renderDecisions(); } syncSide(); }
+  window.shSync=syncSide;
+  window.shDecClose=function(){ if(decOpen) decSet(false); };
+  function openDlg(id){ var d=$(id); if(d.showModal) d.showModal(); else d.setAttribute('open',''); }
+  $('sh-dec-btn').addEventListener('click',function(){ decSet(!decOpen); });
+  $('sh-dec-close').addEventListener('click',function(){ decSet(false); });
+  $('sh-guide-btn').addEventListener('click',function(){ openDlg('sh-guide'); });
+  document.querySelectorAll('dialog.sh-dlg').forEach(function(d){
+    d.addEventListener('click',function(e){ if(e.target===d) d.close(); });
+    d.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click',function(){ d.close(); }); });
+  });
+  $('sh-copy').addEventListener('click',function(){
+    var text=$('sh-prompt-text').textContent, msg=$('sh-copy-msg');
+    var fb=function(){ var r=document.createRange(); r.selectNodeContents($('sh-prompt-text')); var s=getSelection(); s.removeAllRanges(); s.addRange(r); msg.textContent='복사가 막혀서 글을 선택해 뒀어요. Ctrl+C로 복사하세요.'; };
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function(){ msg.textContent='프롬프트를 복사했어요.'; },fb); else fb();
+  });
+
+  /* Handoff: 화면마다 민철이 직접 쓰는 4칸, 공유 db handoff/<화면> */
+  var HO=[
+    ['what','이 화면은 무엇인가요','이 화면에서 사용자가 하는 일을 한두 문장으로. 예) 하루 일정에 블록을 넣고 플랜별 합계를 보는 화면'],
+    ['when','언제 나타나나요','어느 화면에서 무엇을 눌러 들어오는지, 어떤 상황에서 보이는지.'],
+    ['rules','동작 규칙','누르면 무엇이 바뀌는지, 값이 어떻게 이어지는지(합계 · 위쪽 요약 · 저장 뒤 상태), 엣지케이스일 때 어떻게 보이는지.'],
+    ['why','디자인 결정 이유','왜 이렇게 정했는지. 결정 기록에 있는 결정이면 그 결정을 짚어 적어요.'],
+    ['better','5차보다 나아진 점','이 화면이 5차 과제 때보다 무엇이 나아졌는지. 5차 피드백(화면끼리 값이 이어지기 · 쓰는 것만 · 중요한 것부터 · 기간) 중 이 화면에 해당하는 것과 어떻게 바뀌었는지 적어요.']
+  ];
+  var hoDb=null, hoDocs={}, hoScr=null, hoTimer=null, hoPending={}, hoOpen=false, hoFollow=true;
+  var hoStatus=function(t){ $('sh-ho-status').textContent=t||''; };
+  var lsKey=function(no){ return 'trippin-handoff-'+no; };
+  function hoBuild(){
+    var box=$('sh-ho-fields'); box.textContent='';
+    HO.forEach(function(f,i){
+      var w=document.createElement('div'); w.className='ho-f';
+      var l=document.createElement('label'); l.setAttribute('for','ho-'+f[0]); var n=document.createElement('span'); n.className='n'; n.textContent=(i+1)+'.'; l.appendChild(n); l.appendChild(document.createTextNode(f[1]));
+      var d=document.createElement('p'); d.className='d'; d.id='ho-d-'+f[0]; d.textContent=f[2];
+      var t=document.createElement('textarea'); t.id='ho-'+f[0]; t.rows=8; t.setAttribute('aria-describedby',d.id);
+      t.addEventListener('input',function(){ if(!hoScr) return; hoPending[f[0]]=t.value; hoStatus('저장 대기…'); clearTimeout(hoTimer); hoTimer=setTimeout(hoSave,800); });
+      w.appendChild(l); w.appendChild(d); w.appendChild(t); box.appendChild(w);
+    });
+  }
+  function hoFill(){
+    var list=screens(), sel=$('sh-ho-screen'); sel.textContent='';
+    list.forEach(function(s){ var o=document.createElement('option'); o.value=s.dataset.screen; o.textContent=(s.dataset.title||'(이름 없음)'); sel.appendChild(o); });
+    if(!list.length){ hoScr=null; sel.disabled=true; var o=document.createElement('option'); o.textContent='아직 화면이 없어요'; sel.appendChild(o); }
+    else { sel.disabled=false; if(!hoScr || !list.some(function(s){return s.dataset.screen===hoScr;})) hoScr=cur||list[0].dataset.screen; sel.value=hoScr; }
+    hoLoad();
+  }
+  function hoData(no){ if(hoDb) return hoDocs[no]||{}; try{ return JSON.parse(localStorage.getItem(lsKey(no))||'{}'); }catch(e){ return {}; } }
+  function hoLoad(){
+    var d=hoScr?hoData(hoScr):{};
+    HO.forEach(function(f){ var t=$('ho-'+f[0]); t.disabled=!hoScr; if(document.activeElement!==t || !hoScr) t.value=(hoPending[f[0]]!=null && hoScr)?hoPending[f[0]]:(d[f[0]]||''); });
+    if(!hoScr) hoStatus('화면이 생기면 화면마다 적을 수 있어요.');
+    else if(d.updatedAt) hoStatus('마지막 저장 '+new Date(d.updatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}));
+    else hoStatus(hoDb?'아직 적은 내용이 없어요.':'');
+  }
+  function hoSave(){
+    if(!hoScr) return; var no=hoScr, s=screens().filter(function(x){return x.dataset.screen===no;})[0];
+    var rec=Object.assign({}, hoData(no)); HO.forEach(function(f){ rec[f[0]]=$('ho-'+f[0]).value; });
+    rec.screen=no; rec.title=s?(s.dataset.title||''):''; rec.updatedAt=new Date().toISOString();
+    hoPending={};
+    if(hoDb){ hoStatus('저장하는 중…'); hoDb.doc('handoff/'+no).set(rec).then(function(){ if(hoScr===no) hoStatus('저장했어요.'); }).catch(function(){ hoStatus('저장하지 못했어요. 이 보드를 편집할 수 있는 권한이 있어야 저장돼요.'); }); }
+    else { try{ localStorage.setItem(lsKey(no),JSON.stringify(rec)); hoStatus('이 브라우저에만 임시로 저장했어요. 로그인해서 보드를 열면 모두에게 저장돼요.'); }catch(e){ hoStatus('저장할 수 없는 보기예요.'); } }
+  }
+  function hoFlush(){ if(hoTimer){ clearTimeout(hoTimer); hoTimer=null; hoSave(); } }
+  function hoSet(v){
+    hoOpen=v; $('sh-ho').hidden=!v; $('sh-ho-btn').setAttribute('aria-pressed',String(v));
+    if(v){ if(insp) setInsp(false); if(window.shDecClose) window.shDecClose(); hoFollow=true; hoScr=cur; hoFill(); } else hoFlush(); syncSide();
+  }
+  window.shHoClose=function(){ if(hoOpen) hoSet(false); };
+  $('sh-ho-btn').addEventListener('click',function(){ hoSet(!hoOpen); });
+  $('sh-ho-close').addEventListener('click',function(){ hoSet(false); });
+  $('sh-ho-ex').addEventListener('click',function(){ openDlg('sh-ho-exdlg'); });
+  $('sh-ho-screen').addEventListener('change',function(e){ hoFlush(); hoScr=e.target.value; hoFollow=false; hoLoad(); });
+  document.addEventListener('proto:screen',function(e){ if(hoOpen && hoFollow && e.detail.screen && e.detail.screen!==hoScr){ hoFlush(); hoScr=e.detail.screen; hoFill(); } });
+  hoBuild();
+  if(window.claude && window.claude.use){
+    window.claude.use('db').then(function(d){
+      if(!d) return; hoDb=d;
+      d.collection('handoff').onSnapshot(function(snap){ hoDocs={}; snap.docs.forEach(function(doc){ hoDocs[doc.id]=doc.data()||{}; }); if(hoOpen) hoLoad(); },function(){ hoStatus('저장된 Handoff를 불러오지 못했어요.'); });
+    }).catch(function(){});
+  }
+
+  show(); scan();
+  var mo=new MutationObserver(function(){ scan(); if(insp) renderPanel(); });
+  [proto,comps].forEach(function(r){ mo.observe(r,{childList:true,subtree:true,attributes:true,attributeFilter:['style','data-ds','data-figma']}); });
+})();
+</script>
+<!-- ===== BOARD SHELL 끝 ===== -->
