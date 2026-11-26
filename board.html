@@ -1851,12 +1851,15 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     var addBtn06 = s06.querySelector('.s06-tl-head .c-btn'), pages06 = s06.querySelector('.s06-pages');
     var hd06 = heads06.querySelectorAll('.c-plan-header');
     var tplCur06 = hd06[0].cloneNode(true), tplAlt06 = hd06[1].cloneNode(true);
-    var plans06 = {}, cur06 = {}, page06 = 1, PLAN_MAX = 4;
+    var plans06 = {}, cur06 = {}, page06 = 1, day06 = 0, PLAN_MAX = 4;
     var protoOn06 = function(){ var pb = document.querySelector('#sh-nav .proto-btn'); return !!pb && pb.getAttribute('aria-current') === 'true'; };
-    var dayIdx06 = function(){
+    var dayIdx06 = function(){ return day06; };
+    /* Day tab selected · Timeline 머리줄. 프로토타입에서 고른 Day 는 day06 에 따로 두고, 디자인 화면은 Figma 처럼 Day 1 (디자인 · 프로토타입이 같은 DOM 이라 섞이지 않게) */
+    var paintDays06 = function(idx){
       var tabs = days06.querySelectorAll('.c-day-tab');
-      for (var i = 0; i < tabs.length; i++) if (tabs[i].getAttribute('aria-selected') === 'true') return i;
-      return 0;
+      if (idx >= tabs.length) idx = 0;
+      tabs.forEach(function(t, i){ t.setAttribute('aria-selected', String(i === idx)); });
+      if (tabs[idx]) tlTitle06.textContent = tabs[idx].querySelector('.c-day-tab__day').textContent + ' 플랜 비교';
     };
     var render06 = function(n, p, c){
       var cur = heads06.querySelectorAll('.c-plan-header');
@@ -1874,21 +1877,29 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       });
       addBtn06.disabled = n >= PLAN_MAX;
     };
-    var show06 = function(proto){ var d = dayIdx06(); if (proto) render06(plans06[d] || 2, page06, cur06[d] || 0); else render06(2, 1, 0); };
-    reset06 = function(){ plans06 = {}; cur06 = {}; page06 = 1; show06(protoOn06()); };
+    var show06 = function(proto){
+      if (proto) { paintDays06(day06); render06(plans06[day06] || 2, page06, cur06[day06] || 0); }
+      else { paintDays06(0); render06(2, 1, 0); }
+    };
+    reset06 = function(){ plans06 = {}; cur06 = {}; page06 = 1; day06 = 0; show06(protoOn06()); };
     days06.addEventListener('click', function(e){
-      if (document.body.classList.contains('sh-insp')) return;
+      if (document.body.classList.contains('sh-insp') || !protoOn06()) return;
       var tab = e.target.closest('.c-day-tab'); if (!tab || !days06.contains(tab)) return;
-      days06.querySelectorAll('.c-day-tab').forEach(function(t){ t.setAttribute('aria-selected', String(t === tab)); });
-      tlTitle06.textContent = tab.querySelector('.c-day-tab__day').textContent + ' 플랜 비교';
-      page06 = 1; show06(protoOn06());
+      day06 = Array.prototype.indexOf.call(days06.querySelectorAll('.c-day-tab'), tab);
+      page06 = 1; show06(true);
     });
-    addBtn06.addEventListener('click', function(){
+    addBtn06.addEventListener('click', function(e){
       if (document.body.classList.contains('sh-insp') || !protoOn06()) return;
       var d = dayIdx06(), n = plans06[d] || 2;
       if (n >= PLAN_MAX) return;
+      var kb = e.detail === 0 && document.activeElement === addBtn06;
       plans06[d] = n + 1; page06 = Math.ceil((n + 1) / 2);
       show06(true);
+      /* Enter · Space 로 4번째 플랜을 만들어 Button 이 disabled 가 되면 focus 를 새 플랜 D 의 link 로 (body 로 빠지지 않게) */
+      if (kb && addBtn06.disabled) {
+        var nl = heads06.querySelectorAll('.c-plan-header:not(.s06-slot-empty) .c-link');
+        if (nl.length) nl[nl.length - 1].focus();
+      }
     });
     pages06.addEventListener('click', function(e){
       var b = e.target.closest('.c-page-btn');
@@ -1898,18 +1909,18 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       if (!p || p === page06) return;
       page06 = p; show06(true);
     });
-    /* 「이 플랜으로 정하기」 link: 누른 plan header 가 Type=Current(「현재플랜」 status chip), 원래 Current 는 Type=Alternative. 자리 · Grid 레인 순서는 그대로, Day 마다 따로 (11.26 민철 결정 「자리 그대로 Type만 바꾸기」) */
+    /* 「이 플랜으로 정하기」 link: 누른 plan header 가 Type=Current(「현재플랜」 status chip), 원래 Current 는 Type=Alternative. 자리 · Grid 레인 순서는 그대로 (11.26 민철 결정 「자리 그대로 Type만 바꾸기」). Claude 가 정한 것: 현재플랜도 Day 마다 따로 · 새로 저장하면 모든 Day 가 다시 플랜 A */
     heads06.addEventListener('click', function(e){
       var a = e.target.closest('.c-link');
       if (!a || !heads06.contains(a) || document.body.classList.contains('sh-insp') || !protoOn06()) return;
       var k = Array.prototype.indexOf.call(heads06.querySelectorAll('.c-plan-header'), a.closest('.c-plan-header'));
       var d = dayIdx06(), i = (page06 - 1) * 2 + k;
       if (k < 0 || i >= (plans06[d] || 2)) return;
-      var hadFocus = document.activeElement === a;
+      var kb = e.detail === 0 && document.activeElement === a;
       cur06[d] = i; show06(true);
-      /* 키보드로 눌렀으면 focus 를 이 페이지에 남은 link 로 (없으면 pagination 의 지금 페이지) */
-      if (hadFocus) {
-        var next = heads06.querySelector('.c-plan-header:not(.s06-slot-empty) .c-link') || (!pages06.hidden && pages06.querySelector('[aria-current="page"]'));
+      /* Enter · Space 로 눌렀을 때만 focus 를 옮김: 이 페이지에 남은 link → 「플랜추가」 Button → pagination 의 지금 페이지. 마우스 클릭은 focus 를 옮기지 않아 화면이 스크롤되지 않음 */
+      if (kb) {
+        var next = heads06.querySelector('.c-plan-header:not(.s06-slot-empty) .c-link') || (!addBtn06.disabled && addBtn06) || (!pages06.hidden && pages06.querySelector('[aria-current="page"]'));
         if (next) next.focus();
       }
     });
