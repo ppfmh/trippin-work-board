@@ -1239,6 +1239,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
 .c-block-editor .c-select__box > .ic-map-pin{color:var(--ds-color-icon-info)}
 /* 계획 시간 dropdown: option 이 48개라 DS dropdown 높이(184)에서 scroll (11.26 「30분 간격」) */
 .c-block-editor .s06-time-sel .c-select__dropdown{height:184px}
+.c-block-editor .c-select.is-up .c-select__dropdown{top:auto;bottom:40px}
 .c-block-editor .s06-time-sel .c-dropdown__list{height:100%;overflow-y:auto;scrollbar-width:none}
 .c-block-editor .s06-time-sel .c-dropdown__list::-webkit-scrollbar{display:none}
 .c-block-editor .s06-time-sel .c-dropdown__bar{left:auto;right:7px;top:7px;height:170px}
@@ -2145,12 +2146,23 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       btnOff.forEach(function(b, k){ var g = btnOn[k] && btnOn[k].getAttribute('data-go'); if (g) b.setAttribute('data-go', g); });
       pickAll06(offNodes, '.c-block-editor__err').forEach(function(x){ x.hidden = true; });
       pickAll06(offNodes, '.c-textbox__input').forEach(function(x){ x.setAttribute('aria-label', '메모'); });
+      offNodes.concat(pickAll06(offNodes, '.c-col.sz-h657')).forEach(function(x){ if (x.matches && x.matches('.c-col.sz-h657')) { x.classList.remove('sz-h657'); x.classList.add('sz-h701'); } });   /* Figma frame 06 · 07 처럼 map=off 에서도 취소 · 저장 줄이 맨 아래 그대로 */
       maps06[sec.dataset.screen] = { sheet: sheet, onNodes: onNodes, offNodes: offNodes, off: false };
       be.addEventListener('click', function(e){
         if (!e.target.closest('[data-map-toggle]') || document.body.classList.contains('sh-insp') || !protoOn06()) return;
         setMap06(sec, !maps06[sec.dataset.screen].off);
       });
     });
+    /* block editor select dropdown 이 잘리지 않게 (독립 검사에서 찾음): 메모가 열려 안쪽이 스크롤이면 그만큼 내리고, frame 아래로 넘치면 위로 엶 */
+    var fitDD06 = function(sel){
+      sel.classList.remove('is-up');
+      if (!sel.classList.contains('is-open')) return;
+      var dd = sel.querySelector('.c-select__dropdown'); if (!dd) return;
+      var r = dd.getBoundingClientRect(), area = sel.closest('.s06-memo-open > .c-col');
+      if (area) { var ab = area.getBoundingClientRect().bottom; if (r.bottom > ab) area.scrollTop += Math.ceil(r.bottom - ab); return; }
+      var fr = sel.closest('.s-frame'); if (fr && r.bottom > fr.getBoundingClientRect().bottom) sel.classList.add('is-up');
+    };
+    tlSecs.forEach(function(sec){ sec.querySelector('.c-block-editor').addEventListener('click', function(e){ var box = e.target.closest && e.target.closest('.c-select__box'); if (box) fitDD06(box.parentNode); }); });
     var be06 = s06.querySelector('.c-block-editor');
     if (be06) be06.addEventListener('input', function(e){
       if (!e.target.matches) return;
@@ -2168,6 +2180,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     document.addEventListener('proto:screen', function(e){
       var d = e.detail || {}; if (d.screen !== '06' && d.screen !== '07') return;
       var proto = d.mode === 'proto';
+      if (!proto) tlSecs.forEach(function(sec){ setMap06(sec, false); });   /* 먼저 map=off 값을 map=on 으로 옮긴 다음에 담아 둠 (안 그러면 map=off 에서 고른 시간 · 메모가 사라짐) */
       paintCat06(proto);
       paintCur06(proto);
       paintTimes06(proto);
@@ -2175,10 +2188,10 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       paintMemo06(proto);
       paintFiles06(proto);
       tlSecs.forEach(function(sec){
-        if (!proto) setMap06(sec, false);
         sec.querySelectorAll('.c-block-editor input, .c-block-editor textarea').forEach(function(el){
           if (!proto) { if (el.value) { stash06.set(el, el.value); el.value = ''; } }
           else if (stash06.has(el)) { el.value = stash06.get(el); stash06.delete(el); }
+          if (el.tagName === 'TEXTAREA' && countMemo06) countMemo06(el);
         });
       });
       var ts06 = (d.screen === '06' ? s06 : s07).querySelector('.s06-time-scroll');
@@ -2328,9 +2341,11 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       pickAll06(nodes, '.c-block-editor__addr').forEach(function(a){ addrFigma06.set(a, a.textContent); addrEls06.push(a); });
       sec.querySelector('.c-block-editor').addEventListener('click', function(e){
         if (!e.target.closest('[data-pick-addr]') || document.body.classList.contains('sh-insp') || !protoOn06()) return;
+        var hadPickFocus = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-pick-addr]'));
         if (maps06[sec.dataset.screen] && maps06[sec.dataset.screen].off) setMap06(sec, false);
         var a = sec.querySelector('.c-block-editor .c-block-editor__addr');
         if (a) a.textContent = PIN_ADDR06;
+        if (hadPickFocus && !sec.contains(document.activeElement)) { var pl = sec.querySelector('.c-block-editor [data-pick-addr]'); if (pl) pl.focus(); }
       });
     });
     var paintAddr06 = function(proto){
@@ -2395,7 +2410,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     var files06 = {}, fileStash06 = {};
     var paintFile06 = function(sec, name){
       var st = maps06[sec.dataset.screen]; if (!st) return;
-      pickAll06(st.onNodes.concat(st.offNodes), '[data-file-add] .ts-body-sm-medium').forEach(function(t){ t.textContent = name || '파일첨부'; t.classList.toggle('s06-file-name', !!name); t.parentNode.parentNode.setAttribute('title', name || ''); });
+      pickAll06(st.onNodes.concat(st.offNodes), '[data-file-add] .ts-body-sm-medium').forEach(function(t){ t.textContent = name || '파일첨부'; t.classList.toggle('s06-file-name', !!name); t.parentNode.parentNode.removeAttribute('title'); });
     };
     tlSecs.forEach(function(sec){
       var st = maps06[sec.dataset.screen]; if (!st) return;
