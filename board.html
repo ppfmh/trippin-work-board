@@ -1207,7 +1207,8 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
 .c-text-field__btn:focus-visible{outline:var(--ds-spacing-border-width-sm) solid var(--ds-color-border-interactive-focused);outline-offset:0}
 /* screen 07 · 첫 블록 · 검색 중 (07 · 08 을 한 화면으로, 11.26 민철 결정): Grid Slot 안 Plan block/new 는 Slot 너비(Figma 416), 미리보기는 0.5초 동안 나타남 (Figma Smart animate 0.5초) */
 .c-grid__slot > .c-plan-block{width:100%}
-.s07-preview{transition:opacity .5s ease-out}
+.s07-preview{transition:none}
+.s07-preview[data-state=editing]{transition:opacity .5s ease-out}
 .s07-preview[hidden]{display:none}
 /* screen 07 블록 미리보기: Grid 시간 줄에 맞춤 (11.26 민철 결정 「시간 줄에 맞추기」) — 위쪽 = 시작 시간 줄, 높이 = 걸리는 시간 (1시간 = 56, 08:00 = 0 · 01:00 = 952) */
 .s06-frame .c-grid__slot{position:relative}
@@ -1994,7 +1995,8 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     });
     heads06.addEventListener('keydown', function(e){
       var el = nameEl06(e); if (!el) return;
-      if (e.isComposing || e.keyCode === 229) return;   /* 한글 조합 중 Enter 는 글자 확정 */
+      if (e.key === 'Escape') e.stopPropagation();   /* 전체 화면이 닫히지 않게 (한글 조합 중에도) */
+      if (e.isComposing || e.keyCode === 229) return;   /* 한글 조합 중 Enter · Esc 는 IME 가 먼저 */
       if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); el.textContent = el.getAttribute('data-name') || ''; el.blur(); }
     });
@@ -2073,6 +2075,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     var setMap06 = function(sec, off){
       var st = maps06[sec.dataset.screen]; if (!st || st.off === off) return;
       var sheet = st.sheet, cur = [].slice.call(sheet.childNodes), next = off ? st.offNodes : st.onNodes;
+      var hadToggleFocus = document.activeElement && document.activeElement.closest && !!document.activeElement.closest('[data-map-toggle]') && sheet.contains(document.activeElement);
       syncMap06(cur, next);
       cur.forEach(function(n){ sheet.removeChild(n); });
       next.forEach(function(n){ sheet.appendChild(n); });
@@ -2082,11 +2085,16 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       if (!off && openMemo06) { var mt = pick06(st.onNodes, '.s06-memo textarea'); if (mt && mt.value) openMemo06(sec, true); }
       if (onTime06) onTime06(sec);
       if (sec === s07 && onCur06) onCur06();
+      if (hadToggleFocus) { var tg = pick06(next, '[data-map-toggle]'); if (tg) tg.focus(); }
     };
     if (offTpl06) tlSecs.forEach(function(sec){
       var be = sec.querySelector('.c-block-editor'), sheet = be.querySelector('.c-block-editor__sheet');
       var onNodes = [].slice.call(sheet.childNodes), offNodes = [].slice.call(offTpl06.cloneNode(true).childNodes);
       markToggle06(onNodes); markToggle06(offNodes);
+      var btnOn = pickAll06(onNodes, '.c-btn'), btnOff = pickAll06(offNodes, '.c-btn');
+      btnOff.forEach(function(b, k){ var g = btnOn[k] && btnOn[k].getAttribute('data-go'); if (g) b.setAttribute('data-go', g); });
+      pickAll06(offNodes, '.c-block-editor__err').forEach(function(x){ x.hidden = true; });
+      pickAll06(offNodes, '.c-textbox__input').forEach(function(x){ x.setAttribute('aria-label', '메모'); });
       maps06[sec.dataset.screen] = { sheet: sheet, onNodes: onNodes, offNodes: offNodes, off: false };
       be.addEventListener('click', function(e){
         if (!e.target.closest('[data-map-toggle]') || document.body.classList.contains('sh-insp') || !protoOn06()) return;
@@ -2095,6 +2103,10 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     });
     /* 디자인 화면은 Figma 그대로: 06 · 07 을 디자인으로 보면 block editor 를 map=on 으로, 프로토타입에서 입력한 값(검색어 · 제목 · 금액 · textbox)은 잠깐 비우고 프로토타입으로 돌아오면 다시 채움 */
     var stash06 = new WeakMap();
+    var resetInputs06 = function(){
+      stash06 = new WeakMap();
+      tlSecs.forEach(function(sec){ var st = maps06[sec.dataset.screen]; if (!st) return; pickAll06(st.onNodes.concat(st.offNodes), 'input').forEach(function(x){ x.value = ''; }); });
+    };
     document.addEventListener('proto:screen', function(e){
       var d = e.detail || {}; if (d.screen !== '06' && d.screen !== '07') return;
       var proto = d.mode === 'proto';
@@ -2254,7 +2266,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
       var st = maps06[sec.dataset.screen]; if (!st) return;
       var cost = pickAll06(st.onNodes, '.c-block-editor__label').filter(function(l){ return l.textContent === '비용'; })[0];
       var costCol = cost && cost.closest('.c-col');
-      if (costCol) costCol.insertAdjacentHTML('afterend', '<label class="c-textbox sz-w352 s06-memo" data-ds="textbox" hidden><textarea class="c-textbox__input ts-body-md-medium" placeholder="text." aria-label="text."></textarea><span class="c-textbox__foot"><span class="c-textbox__count ts-body-sm-regular">0/100</span><span class="c-textbox__grab ic-grabber-lines" aria-hidden="true"></span></span></label>');
+      if (costCol) costCol.insertAdjacentHTML('afterend', '<label class="c-textbox sz-w352 s06-memo" data-ds="textbox" hidden><textarea class="c-textbox__input ts-body-md-medium" placeholder="text." aria-label="메모"></textarea><span class="c-textbox__foot"><span class="c-textbox__count ts-body-sm-regular">0/100</span><span class="c-textbox__grab ic-grabber-lines" aria-hidden="true"></span></span></label>');
       pickAll06(st.onNodes.concat(st.offNodes), '.c-textbox__input').forEach(function(ta){ ta.maxLength = 100; });
       pickAll06(st.onNodes.concat(st.offNodes), '.c-link').forEach(function(l){ if (/메모추가/.test(l.textContent)) l.setAttribute('data-memo-add', ''); });
       var be = sec.querySelector('.c-block-editor');
@@ -2322,7 +2334,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     var resetFiles06 = function(){ files06 = {}; tlSecs.forEach(function(sec){ paintFile06(sec, ''); }); };
     var tl06 = {};
     tl06['06'] = bindTL06(s06, function(p, proto){ paintSel06(s06, proto); });
-    reset06 = function(){ plans06 = {}; cur06 = {}; names06 = {}; sel06 = {}; page06 = 1; day06 = 0; tlSecs.forEach(function(x){ setMap06(x, false); }); cat06 = 'food'; cy06 = 'JPY'; resetTimes06(); resetAddr06(); resetMemo06(); resetFiles06(); var on = protoOn06(); paintCat06(on); paintCur06(on); for (var k in tl06) tl06[k](on); };
+    reset06 = function(){ plans06 = {}; cur06 = {}; names06 = {}; sel06 = {}; page06 = 1; day06 = 0; tlSecs.forEach(function(x){ setMap06(x, false); }); cat06 = 'food'; cy06 = 'JPY'; resetTimes06(); resetAddr06(); resetMemo06(); resetFiles06(); resetInputs06(); var on = protoOn06(); paintCat06(on); paintCur06(on); for (var k in tl06) tl06[k](on); };
     document.addEventListener('proto:screen', function(e){ var d = e.detail || {}; if (tl06[d.screen]) tl06[d.screen](d.mode === 'proto'); });
     /* 화면 06 · 07 · 내비게이션 바: screen 01 · 03 과 같은 동작 (이전 화면 구조를 따름) */
     tlSecs.forEach(function(sec){ bindListScreen(sec); });
@@ -2393,6 +2405,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
         if (d.screen !== '07') return;
         paint07(false);
         if (d.mode === 'proto') {
+          setMap06(s07, false);   /* 검색으로 들어오면 늘 map=on (검색 text field · loading 이 보이게) */
           /* 아무 플랜도 안 고르고 검색하면 그 Day 의 현재플랜을 골라 줌 (Figma 07: A selected · Claude 가 정한 것) */
           var sel = sel06[day06] || (sel06[day06] = {});
           if (!Object.keys(sel).length) { sel[cur06[day06] || 0] = true; tlSecs.forEach(function(x){ paintSel06(x, true); }); paintPreview07(); }
