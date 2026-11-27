@@ -923,7 +923,8 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
 .c-plan-block[data-state=editing]{border:0;background-color:var(--ds-color-bg-info-subtle);opacity:.5}
 .c-plan-block[aria-selected=true],.c-plan-block[data-state=selected]{border:0;background-color:var(--ds-color-bg-interactive-selected);box-shadow:0 0 0 var(--ds-spacing-border-width-sm) var(--ds-color-border-interactive-primary)}
 .c-plan-block--empty{opacity:0;box-shadow:0 var(--ds-effect-shadow-2-core-y) var(--ds-effect-shadow-2-core-blur) 0 var(--ds-color-effect-shadow-core),0 var(--ds-effect-shadow-2-cast-y) var(--ds-effect-shadow-2-cast-blur) 0 var(--ds-color-effect-shadow-cast)}
-.c-plan-block--30min{height:28px;padding-top:var(--ds-spacing-spacing-2);padding-bottom:var(--ds-spacing-spacing-2)}
+.c-plan-block--30min{height:28px;padding:calc(var(--ds-spacing-spacing-2) - var(--ds-spacing-border-width-sm)) calc(var(--ds-spacing-spacing-8) - var(--ds-spacing-border-width-sm))}
+.c-plan-block--30min[data-state=editing],.c-plan-block--30min[data-state=selected],.c-plan-block--30min[aria-selected=true]{padding:var(--ds-spacing-spacing-2) var(--ds-spacing-spacing-8)}
 .c-plan-block--30min .c-plan-block__meta,.c-plan-block--30min .c-plan-block__memo,.c-plan-block--30min .c-plan-block__alerts{display:none}
 .c-plan-block--30min .c-plan-block__side{flex-direction:row;justify-content:flex-start;align-items:center;gap:var(--ds-spacing-spacing-4)}
 /* Grid */
@@ -1227,7 +1228,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
 .s07-preview{transition:none}
 .s07-preview[data-state=editing]{transition:opacity .5s ease-out}
 .s07-preview[hidden]{display:none}
-/* screen 07 블록 미리보기: Grid 시간 줄에 맞춤 (11.26 민철 결정 「시간 줄에 맞추기」) — 위쪽 = 시작 시간 줄, 높이 = 걸리는 시간 (1시간 = 56, 08:00 = 0 · 01:00 = 952) */
+/* screen 07 블록 미리보기: Grid 시간 줄에 맞춤 (11.26 민철 결정 「시간 줄에 맞추기」) — 위쪽 = 시작 시간 줄, 높이 = 걸리는 시간 (1시간 = 56, 00:00 = 0 · 08:00 = 448 · 24:00 = 1344) */
 .s06-frame .c-grid__slot{position:relative}
 .s07-preview{position:absolute;left:0;top:0}
 .s07-preview.s07-out{display:none}
@@ -2175,7 +2176,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     save06();
     /* 디자인 화면은 Figma 그대로: 06 · 07 을 디자인으로 보면 block editor 를 map=on 으로, 프로토타입에서 입력한 값(검색어 · 제목 · 금액 · textbox)은 잠깐 비우고 프로토타입으로 돌아오면 다시 채움 */
     var stash06 = new WeakMap();
-    var scroll06 = new WeakMap(); /* 프로토타입에서 내린 Timeline 시간 칸 위치 (디자인 화면은 Figma 처럼 맨 위 08:00) */
+    var scroll06 = new WeakMap(); /* 프로토타입에서 내린 Timeline 시간 칸 위치 (디자인 화면은 Figma 처럼 맨 위 00:00) */
     var resetInputs06 = function(){
       stash06 = new WeakMap();
       tlSecs.forEach(function(sec){ var st = maps06[sec.dataset.screen]; if (!st) return; pickAll06(st.onNodes.concat(st.offNodes), 'input').forEach(function(x){ x.value = ''; }); });
@@ -2458,7 +2459,7 @@ body.sh-full #proto > .sh-on > *{box-sizing:border-box;width:100%;min-height:cal
     }
     var tl06 = {};
     tl06['06'] = bindTL06(s06, function(p, proto){ paintSel06(s06, proto); });
-    reset06 = function(){ plans06 = {}; cur06 = {}; names06 = {}; sel06 = {}; page06 = 1; day06 = 0; tlSecs.forEach(function(x){ setMap06(x, false); }); cat06 = 'food'; cy06 = 'JPY'; resetTimes06(); resetAddr06(); resetMemo06(); resetFiles06(); resetInputs06(); save06(); scroll06 = new WeakMap(); tlSecs.forEach(function(x){ var ts = x.querySelector('.s06-time-scroll'); if (ts) { ts.scrollTop = 0; scroll06.set(ts, 0); } }); /* 숨은 화면은 scrollTop 이 안 먹어서, 다음에 프로토타입으로 보일 때 08:00 으로 */ var on = protoOn06(); paintCat06(on); paintCur06(on); for (var k in tl06) tl06[k](on); };
+    reset06 = function(){ plans06 = {}; cur06 = {}; names06 = {}; sel06 = {}; page06 = 1; day06 = 0; tlSecs.forEach(function(x){ setMap06(x, false); }); cat06 = 'food'; cy06 = 'JPY'; resetTimes06(); resetAddr06(); resetMemo06(); resetFiles06(); resetInputs06(); save06(); scroll06 = new WeakMap(); tlSecs.forEach(function(x){ var ts = x.querySelector('.s06-time-scroll'); if (ts) { ts.scrollTop = 0; scroll06.set(ts, 0); } }); /* 숨은 화면은 scrollTop 이 안 먹어서, 다음에 프로토타입으로 보일 때 맨 위 00:00 으로 */ var on = protoOn06(); paintCat06(on); paintCur06(on); for (var k in tl06) tl06[k](on); };
     document.addEventListener('proto:screen', function(e){ var d = e.detail || {}; if (tl06[d.screen]) tl06[d.screen](d.mode === 'proto'); });
     /* 화면 06 · 07 · 내비게이션 바: screen 01 · 03 과 같은 동작 (이전 화면 구조를 따름) */
     tlSecs.forEach(function(sec){ bindListScreen(sec); });
